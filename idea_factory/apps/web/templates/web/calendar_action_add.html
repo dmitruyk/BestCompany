@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Add Action - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'company_calendar' company_pk=company.pk %}" class="text-sm text-indigo-600 hover:text-indigo-800">← Calendar</a>
+    <h1 class="text-xl font-bold text-slate-900 mt-1">Add Action</h1>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-md">
+    <form method="post">
+        {% csrf_token %}
+        <div class="space-y-4">
+            <div>
+                <label for="title" class="block text-sm font-medium text-slate-700 mb-1">Title</label>
+                <input type="text" id="title" name="title" required
+                    class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="e.g. Launch marketing campaign">
+            </div>
+            <div>
+                <label for="description" class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <textarea id="description" name="description" rows="3"
+                    class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Optional details..."></textarea>
+            </div>
+            <div>
+                <label for="action_date" class="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                <input type="date" id="action_date" name="action_date" value="{{ today }}"
+                    min="{{ min_date }}"
+                    class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required>
+            </div>
+        </div>
+        <button type="submit" class="mt-4 inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            Add to Calendar
+        </button>
+    </form>
+</div>
+{% endblock %}

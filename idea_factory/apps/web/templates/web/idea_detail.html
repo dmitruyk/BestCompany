@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}{{ idea.title }} - Idea Factory{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex justify-between items-start">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">{{ idea.title }}</h1>
+        <p class="mt-1 text-slate-500">Created {{ idea.created_at|date:"M d, Y H:i" }} · {{ idea.get_provider_display }}{% if idea.model_id %} · {{ idea.model_id }}{% endif %}</p>
+        <div class="mt-2 flex flex-wrap gap-2 items-center">
+            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                {% if idea.status == 'SUCCEEDED' %}bg-green-100 text-green-800
+                {% elif idea.status == 'RUNNING' %}bg-blue-100 text-blue-800
+                {% elif idea.status == 'FAILED' %}bg-red-100 text-red-800
+                {% elif idea.status == 'CANCELLED' %}bg-amber-100 text-amber-800
+                {% else %}bg-slate-100 text-slate-800{% endif %}">
+                {{ idea.get_status_display }}
+            </span>
+            {% if idea.development_status != 'NOT_STARTED' %}
+            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                {% if idea.development_status == 'READY' or idea.development_status == 'DEVELOPING' %}bg-emerald-100 text-emerald-800
+                {% elif idea.development_status == 'GENERATING_FLEET' %}bg-blue-100 text-blue-800
+                {% else %}bg-slate-100 text-slate-800{% endif %}">
+                {{ idea.get_development_status_display }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+        {% if idea.status == 'SUCCEEDED' and idea.development_status == 'NOT_STARTED' %}
+        <form method="post" action="{% url 'accept_idea' pk=idea.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700" aria-label="Start Developing - Generate agent fleet">
+                Start Developing
+            </button>
+        </form>
+        {% endif %}
+        {% if idea.development_status == 'READY' and idea.company %}
+        <a href="{% url 'company_detail' pk=idea.company.pk %}" class="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700">
+            Open Company
+        </a>
+        {% endif %}
+        {% if idea.status == 'RUNNING' %}
+        <form method="post" action="{% url 'stop_pipeline' pk=idea.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700" aria-label="Stop pipeline">
+                Stop
+            </button>
+        </form>
+        {% endif %}
+        {% if has_failed_runs %}
+        <form method="post" action="{% url 'rerun_failed' pk=idea.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700">
+                Rerun failed steps
+            </button>
+        </form>
+        {% endif %}
+        {% if idea.status != 'RUNNING' %}
+        <form method="post" action="{% url 'rerun_from_scratch' pk=idea.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50" aria-label="Rerun entire pipeline from scratch">
+                Rerun from scratch
+            </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'download_json' pk=idea.pk %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
+            Download JSON
+        </a>
+        <a href="{% url 'delete_idea_confirm' pk=idea.pk %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50">
+            Delete
+        </a>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-2">Request</h2>
+    <p class="text-slate-600 whitespace-pre-wrap">{{ idea.prompt }}</p>
+</div>
+
+{% if conclusion or result_bundle.final_summary %}
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-2">Final Summary</h2>
+    <p class="text-slate-600 whitespace-pre-wrap">{{ result_bundle.final_summary }}</p>
+</div>
+{% endif %}
+
+<div class="mb-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-4">Agent Runs</h2>
+    <div class="space-y-4">
+        {% for run in runs %}
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <button type="button" onclick="toggleRun('run-{{ run.id }}')" class="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-slate-50"
+                aria-expanded="false" aria-controls="run-{{ run.id }}" id="btn-run-{{ run.id }}">
+                <div class="flex items-center gap-4">
+                    <span class="font-medium text-slate-900">{{ run.agent_name }}</span>
+                    <span class="text-sm text-slate-500">{{ run.get_role_display }}</span>
+                    {% if run.role == 'evaluator' %}
+                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Quality Check</span>
+                    {% elif run.role == 'prompt_generator' %}
+                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-800">Prompt Improvement</span>
+                    {% endif %}
+                    {% if run.confidence is not None %}
+                    <span class="text-sm text-slate-600">Confidence: {{ run.confidence|floatformat:2 }}</span>
+                    {% endif %}
+                    <span class="text-sm text-slate-500">Cycles: {{ run.cycles }}</span>
+                    {% if run.duration_ms %}
+                    <span class="text-sm text-slate-500">{{ run.duration_ms }}ms</span>
+                    {% endif %}
+                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full
+                        {% if run.status == 'SUCCEEDED' %}bg-green-100 text-green-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ run.get_status_display }}
+                    </span>
+                </div>
+                <svg class="w-5 h-5 text-slate-400 transform transition-transform" id="icon-run-{{ run.id }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            <div id="run-{{ run.id }}" class="hidden border-t border-slate-200 px-6 py-4 bg-slate-50">
+                {% if run.error %}
+                <p class="text-sm text-red-600 mb-2">{{ run.error }}</p>
+                {% endif %}
+                {% if run.output_json %}
+                <pre class="text-xs overflow-x-auto p-4 rounded-lg bg-slate-900 text-slate-100 max-h-96 overflow-y-auto">{{ run.output_json }}</pre>
+                {% else %}
+                <p class="text-sm text-slate-500">No structured output.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-slate-500">No agent runs yet. Pipeline may still be running.</p>
+        {% endfor %}
+    </div>
+        {% if idea.status == 'RUNNING' %}
+    <p class="mt-2 text-sm text-slate-500" id="status-msg">Running… Evaluating and improving responses. Page refreshes automatically.</p>
+    {% endif %}
+    {% if idea.development_status == 'GENERATING_FLEET' %}
+    <p class="mt-2 text-sm text-slate-500" id="fleet-status-msg">Generating agent fleet (CPA, Directors, Marketer…)… Page refreshes when ready.</p>
+    {% endif %}
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-2">Save as Conclusion</h2>
+    <p class="text-sm text-slate-500 mb-4">Persist the current result as a saved conclusion.</p>
+    <form method="post" action="{% url 'save_conclusion' pk=idea.pk %}">
+        {% csrf_token %}
+        <textarea name="final_summary" class="hidden">{{ result_bundle.final_summary }}</textarea>
+        <textarea name="result_json" class="hidden">{{ result_json_str }}</textarea>
+        <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            Save as Conclusion
+        </button>
+    </form>
+</div>
+
+<script>
+function toggleRun(id) {
+    const el = document.getElementById(id);
+    const btn = document.getElementById('btn-' + id);
+    const icon = document.getElementById('icon-' + id);
+    if (el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+        icon.classList.add('rotate-180');
+    } else {
+        el.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+        icon.classList.remove('rotate-180');
+    }
+}
+
+{% if idea.status == 'RUNNING' or idea.development_status == 'GENERATING_FLEET' %}
+(function pollStatus(lastRunsCount) {
+    lastRunsCount = lastRunsCount || {{ runs|length }};
+    fetch('{% url "idea_status" pk=idea.pk %}')
+        .then(r => r.json())
+        .then(function(data) {
+            if (data.status !== 'RUNNING' && data.development_status !== 'GENERATING_FLEET') {
+                window.location.reload();
+                return;
+            }
+            if (data.development_status === 'READY' || data.company_id) {
+                window.location.reload();
+                return;
+            }
+            if (data.runs_count > lastRunsCount) {
+                window.location.reload();
+                return;
+            }
+            var statusEl = document.getElementById('status-msg');
+            var fleetEl = document.getElementById('fleet-status-msg');
+            if (statusEl) statusEl.textContent = data.last_agent ? 'Running: ' + data.last_agent + '…' : 'Running…';
+            if (fleetEl) fleetEl.textContent = 'Generating agent fleet…';
+            setTimeout(function() { pollStatus(data.runs_count); }, 2500);
+        })
+        .catch(function() { setTimeout(function() { pollStatus(lastRunsCount); }, 5000); });
+})();
+{% endif %}
+</script>
+{% endblock %}

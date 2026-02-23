@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Delete - {{ idea.title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h1 class="text-xl font-bold text-slate-900 mb-4">Delete request?</h1>
+        <p class="text-slate-600 mb-4">
+            Are you sure you want to delete <strong>{{ idea.title }}</strong>?
+            All agent runs and conclusions will be permanently removed.
+        </p>
+        <div class="flex gap-3">
+            <form method="post" action="{% url 'delete_idea' pk=idea.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">
+                    Yes, delete
+                </button>
+            </form>
+            <a href="{% url 'idea_detail' pk=idea.pk %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                Cancel
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

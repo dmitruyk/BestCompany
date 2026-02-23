@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}My Companies - Idea Factory{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <h1 class="text-2xl font-bold text-slate-900">My Companies</h1>
+    <a href="{% url 'home' %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
+        ← Back to Ideas
+    </a>
+</div>
+
+<p class="text-slate-600 mb-6">Companies created from accepted ideas. Each company has an agent fleet (CPA, Directors, Marketer, etc.) ready to assist you.</p>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-slate-200">
+        <thead class="bg-slate-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Company</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Idea</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Agents</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Created</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+            {% for company in companies %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4">
+                    <a href="{% url 'company_detail' pk=company.pk %}" class="font-medium text-indigo-600 hover:text-indigo-800">
+                        {{ company.name }}
+                    </a>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-600">{{ company.idea_request.title }}</td>
+                <td class="px-6 py-4 text-sm text-slate-600">{{ company.agents.count }} agents</td>
+                <td class="px-6 py-4">
+                    <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                        {% if company.status == 'ACTIVE' %}bg-green-100 text-green-800
+                        {% elif company.status == 'INITIALIZING' %}bg-blue-100 text-blue-800
+                        {% else %}bg-slate-100 text-slate-800{% endif %}">
+                        {{ company.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-500">{{ company.created_at|date:"M d, Y H:i" }}</td>
+                <td class="px-6 py-4 text-right">
+                    <a href="{% url 'company_detail' pk=company.pk %}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Open</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="px-6 py-12 text-center text-slate-500">
+                    No companies yet. Accept an idea and click <strong>Start Developing</strong> to create your first company.
+                    <a href="{% url 'home' %}" class="text-indigo-600 hover:underline ml-1">View ideas</a>.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

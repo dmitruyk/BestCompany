@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}{{ discussion.topic }} - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4 flex justify-between items-start">
+    <div>
+        <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:text-indigo-800">← {{ company.name }}</a>
+        <h1 class="text-xl font-bold text-slate-900 mt-1">{{ discussion.topic }}</h1>
+        <span class="inline-flex mt-2 px-2 py-1 text-xs font-medium rounded-full
+        {% if discussion.status == 'AWAITING_SELECTION' %}bg-amber-100 text-amber-800
+        {% elif discussion.status == 'COMPLETED' %}bg-green-100 text-green-800
+        {% elif discussion.status == 'FAILED' %}bg-red-100 text-red-800
+        {% else %}bg-blue-100 text-blue-800{% endif %}">
+        {{ discussion.get_status_display }}
+        </span>
+    </div>
+    <form method="post" action="{% url 'rerun_discussion' company_pk=company.pk discussion_pk=discussion.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50" aria-label="{% if discussion.status == 'ACTIVE' %}Interrupt and re-run{% else %}Re-run{% endif %} discussion">
+            {% if discussion.status == 'ACTIVE' %}Interrupt & Re-run{% else %}Re-run{% endif %}
+        </button>
+    </form>
+</div>
+
+{% if discussion.status == 'FAILED' %}
+<div class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800">
+    <p class="font-medium">Discussion failed</p>
+    <p class="text-sm mt-1">The director discussion could not complete. This may be due to no directors in the company, provider configuration, or LLM errors. Check server logs.</p>
+</div>
+{% endif %}
+
+<div class="space-y-6">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">Director Messages</h2>
+        <div class="space-y-4">
+            {% for msg in discussion.messages.all %}
+            <div class="p-3 rounded-lg bg-slate-50">
+                <p class="text-sm font-medium text-slate-700">
+                    {% if msg.sender_agent %}{{ msg.sender_agent.name }}{% else %}User{% endif %}
+                </p>
+                <p class="mt-1 text-slate-600 whitespace-pre-wrap text-sm">{{ msg.content }}</p>
+                <p class="mt-1 text-xs text-slate-400">{{ msg.created_at|date:"M d, H:i" }}</p>
+            </div>
+            {% empty %}
+            <p class="text-slate-500" id="no-messages-msg">No messages yet. Directors are thinking…</p>
+            {% endfor %}
+        </div>
+        {% if discussion.status == 'ACTIVE' %}
+        <p class="mt-3 text-sm text-blue-600" id="progress-msg"></p>
+        {% endif %}
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">Action Proposals</h2>
+        <p class="text-sm text-slate-500 mb-4">Select which actions to implement. You are the owner and make the final decision.</p>
+        <div class="space-y-4">
+            {% for action in actions %}
+            <div class="p-4 rounded-lg border {% if action.status == 'SELECTED' %}border-green-300 bg-green-50{% elif action.status == 'REJECTED' %}border-slate-200 bg-slate-50{% else %}border-slate-200 bg-white{% endif %}">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-medium text-slate-900">{{ action.action_type }}</h3>
+                        <p class="mt-1 text-sm text-slate-600">{{ action.description }}</p>
+                        {% if action.rationale %}
+                        <p class="mt-1 text-xs text-slate-500">Rationale: {{ action.rationale }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-xs text-slate-400">Proposed by {{ action.proposed_by.name }}</p>
+                    </div>
+                    {% if action.status == 'PROPOSED' %}
+                    <div class="flex gap-2">
+                        <form method="post" action="{% url 'action_select' company_pk=company.pk action_pk=action.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="inline-flex px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700">
+                                Select
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'action_reject' company_pk=company.pk action_pk=action.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="inline-flex px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                                Reject
+                            </button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                        {% if action.status == 'SELECTED' %}bg-green-100 text-green-800
+                        {% else %}bg-slate-100 text-slate-800{% endif %}">
+                        {{ action.get_status_display }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-slate-500" id="no-actions-msg">
+                {% if discussion.status == 'ACTIVE' %}Waiting for action proposals…{% endif %}
+                {% if discussion.status == 'AWAITING_SELECTION' %}No actions were proposed by directors.{% endif %}
+                {% if discussion.status == 'COMPLETED' %}No actions in this discussion.{% endif %}
+            </p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% if discussion.status == 'ACTIVE' %}
+<script>
+(function pollDiscussion(lastMessages, lastActions) {
+    lastMessages = lastMessages || {{ discussion.messages.count }};
+    lastActions = lastActions || {{ actions|length }};
+    fetch('{% url "discussion_status" company_pk=company.pk discussion_pk=discussion.pk %}')
+        .then(r => r.json())
+        .then(function(data) {
+            var progressEl = document.getElementById('progress-msg');
+            if (progressEl) {
+                if (data.messages_count > 0) {
+                    var txt = data.messages_count + ' of ' + (data.directors_count || '?') + ' directors contributed';
+                    if (data.last_director) txt += ' (last: ' + data.last_director + ')';
+                    progressEl.textContent = txt;
+                } else {
+                    progressEl.textContent = 'Starting discussion…';
+                }
+            }
+            if (data.status !== 'ACTIVE') {
+                window.location.reload();
+                return;
+            }
+            if (data.messages_count > lastMessages || data.actions_count > lastActions) {
+                window.location.reload();
+                return;
+            }
+            setTimeout(function() { pollDiscussion(data.messages_count, data.actions_count); }, 2000);
+        })
+        .catch(function() { setTimeout(function() { pollDiscussion(lastMessages, lastActions); }, 5000); });
+})();
+</script>
+{% endif %}
+{% endblock %}

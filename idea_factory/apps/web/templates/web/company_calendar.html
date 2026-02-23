@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load web_extras %}
+
+{% block title %}Calendar - {{ company.name }}{% endblock %}
+
+{% block content %}
+{% load static %}
+<div class="mb-4 flex justify-between items-center">
+    <div>
+        <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:text-indigo-800">← {{ company.name }}</a>
+        <h1 class="text-xl font-bold text-slate-900 mt-1">Calendar</h1>
+    </div>
+    <div class="flex gap-2">
+        {% if has_prev %}
+        <a href="{% url 'company_calendar' company_pk=company.pk %}?year={{ prev_year }}&month={{ prev_month }}"
+            class="inline-flex px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
+            aria-label="Previous month">←</a>
+        {% else %}
+        <span class="inline-flex px-3 py-1.5 rounded-lg border border-slate-200 text-slate-400 text-sm" aria-label="No earlier months">←</span>
+        {% endif %}
+        <span class="px-4 py-2 text-sm font-medium text-slate-700">{{ year }} – {{ month|stringformat:"02d" }}</span>
+        <a href="{% url 'company_calendar' company_pk=company.pk %}?year={{ next_year }}&month={{ next_month }}"
+            class="inline-flex px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
+            aria-label="Next month">→</a>
+        <a href="{% url 'calendar_action_add' company_pk=company.pk %}"
+            class="inline-flex px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            + Add Action
+        </a>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <table class="min-w-full">
+        <thead class="bg-slate-50">
+            <tr>
+                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Mon</th>
+                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Tue</th>
+                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Wed</th>
+                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Thu</th>
+                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Fri</th>
+                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Sat</th>
+                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Sun</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for week in weeks %}
+            <tr class="border-t border-slate-200">
+                {% for d in week %}
+                <td class="p-1 align-top border-l border-slate-100 min-h-[100px] {% if d.month != month %}bg-slate-50 text-slate-400{% endif %} {% if d|date_lt:start_date %}bg-slate-100{% endif %}">
+                    {% if d|date_gte:start_date %}
+                    <a href="{% url 'company_calendar_date' company_pk=company.pk year=d.year month=d.month day=d.day %}"
+                        class="block p-2 rounded-lg hover:bg-indigo-50 min-h-[80px]"
+                        aria-label="View {{ d }}">
+                        <span class="text-sm font-medium {% if d.month != month %}text-slate-400{% else %}text-slate-900{% endif %}">{{ d.day }}</span>
+                        {% with entries=actions_by_date|get_item:d %}
+                        {% if entries %}
+                        <div class="mt-1 space-y-0.5">
+                            {% for entry in entries %}
+                            <span class="block text-xs truncate rounded px-1 py-0.5
+                                {% if entry.status == 'DONE' %}bg-green-100 text-green-800
+                                {% elif entry.status == 'IN_PROGRESS' %}bg-blue-100 text-blue-800
+                                {% else %}bg-amber-100 text-amber-800{% endif %}">
+                                {{ entry.title }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </a>
+                    {% else %}
+                    <div class="block p-2 min-h-[80px] cursor-not-allowed">
+                        <span class="text-sm text-slate-300">{{ d.day }}</span>
+                    </div>
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

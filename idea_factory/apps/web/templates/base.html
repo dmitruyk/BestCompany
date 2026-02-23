@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Idea Factory{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-50 font-sans text-slate-800 min-h-screen">
+    <nav class="bg-white border-b border-slate-200 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-14 items-center">
+                <a href="{% url 'home' %}" class="text-lg font-semibold text-slate-800 hover:text-indigo-600">
+                    Idea Factory
+                </a>
+                <div class="flex items-center gap-4">
+                    <a href="{% url 'company_list' %}" class="text-sm font-medium text-slate-600 hover:text-indigo-600">
+                        My Companies
+                    </a>
+                    <a href="{% url 'new_idea' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                        New Request
+                    </a>
+                    {% if user.is_authenticated %}
+                        <span class="text-sm text-slate-500">{{ user.username }}</span>
+                        <a href="{% url 'admin:logout' %}" class="text-sm text-slate-500 hover:text-slate-700">Logout</a>
+                    {% else %}
+                        <a href="{% url 'admin:login' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">Login</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% if messages %}
+            <div class="mb-4 space-y-2">
+                {% for message in messages %}
+                    <div class="rounded-lg px-4 py-2 text-sm {% if message.tags == 'error' %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
