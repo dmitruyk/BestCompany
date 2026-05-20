@@ -1,8 +1,11 @@
 {% extends "base.html" %}
+{% load web_extras %}
 
 {% block title %}{{ action_date|date:"M d, Y" }} - {{ company.name }}{% endblock %}
 
 {% block content %}
+{% guide_hint title="Update actions for this day" body="Change status from the dropdown when work starts or finishes. Add completion notes before marking done — useful for your records and readiness reviews." %}
+
 <div class="mb-4 flex justify-between items-center">
     <div>
         <a href="{% url 'company_calendar' company_pk=company.pk %}" class="text-sm text-indigo-600 hover:text-indigo-800">← Calendar</a>

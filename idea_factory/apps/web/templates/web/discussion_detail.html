@@ -1,11 +1,22 @@
 {% extends "base.html" %}
+{% load web_extras %}
 
 {% block title %}{{ discussion.topic }} - {{ company.name }}{% endblock %}
 
 {% block content %}
+{% if discussion.status == 'ACTIVE' %}
+{% guide_hint title="Discussion in progress" body="Directors are debating this topic. This page refreshes automatically when messages or action proposals appear. Use Interrupt & Re-run only if the discussion is stuck or you want a fresh debate." %}
+{% elif discussion.status == 'AWAITING_SELECTION' %}
+{% guide_hint title="Your turn — review proposals" body="Read each action below. Click Select for items you want to implement, or Reject to dismiss. When finished, use Schedule selected on this page or from the company overview to add them to the calendar." %}
+{% elif discussion.status == 'COMPLETED' %}
+{% guide_hint title="Discussion completed" body="Selected actions should appear on the calendar. Open Calendar from the company page to track progress, or start a new discussion for the next topic." %}
+{% elif discussion.status == 'FAILED' %}
+{% guide_hint title="What to do next" body="Fix the issue described below (directors, LLM config, or server logs), then click Re-run to start the discussion again." %}
+{% endif %}
+
 <div class="mb-4 flex justify-between items-start">
     <div>
-        <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:text-indigo-800">← {{ company.name }}</a>
+        <a href="{% url 'company_detail' pk=company.pk %}" class="link-back">← {{ company.name }}</a>
         <h1 class="text-xl font-bold text-slate-900 mt-1">{{ discussion.topic }}</h1>
         <span class="inline-flex mt-2 px-2 py-1 text-xs font-medium rounded-full
         {% if discussion.status == 'AWAITING_SELECTION' %}bg-amber-100 text-amber-800
@@ -35,12 +46,12 @@
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Director Messages</h2>
         <div class="space-y-4">
             {% for msg in discussion.messages.all %}
-            <div class="p-3 rounded-lg bg-slate-50">
-                <p class="text-sm font-medium text-slate-700">
+            <div class="p-4 rounded-lg bg-slate-50 border border-slate-100">
+                <p class="text-sm font-semibold text-slate-800">
                     {% if msg.sender_agent %}{{ msg.sender_agent.name }}{% else %}User{% endif %}
                 </p>
-                <p class="mt-1 text-slate-600 whitespace-pre-wrap text-sm">{{ msg.content }}</p>
-                <p class="mt-1 text-xs text-slate-400">{{ msg.created_at|date:"M d, H:i" }}</p>
+                <p class="mt-2 text-slate-700 whitespace-pre-wrap leading-relaxed">{{ msg.content }}</p>
+                <p class="mt-2 text-xs text-slate-500">{{ msg.created_at|date:"M d, H:i" }}</p>
             </div>
             {% empty %}
             <p class="text-slate-500" id="no-messages-msg">No messages yet. Directors are thinking…</p>
@@ -53,7 +64,7 @@
 
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Action Proposals</h2>
-        <p class="text-sm text-slate-500 mb-4">Select which actions to implement. You are the owner and make the final decision.</p>
+        <p class="text-sm text-slate-600 mb-4">You are the owner — <strong>Select</strong> actions to approve, <strong>Reject</strong> ones you will not pursue, then <strong>Schedule selected</strong> to plan them on the calendar.</p>
         {% if unscheduled_selected_count > 0 %}
         <form method="post" action="{% url 'run_autonomous_loop_now' pk=company.pk %}" class="mb-4">
             {% csrf_token %}
@@ -74,7 +85,7 @@
                         {% if action.rationale %}
                         <p class="mt-1 text-xs text-slate-500">Rationale: {{ action.rationale }}</p>
                         {% endif %}
-                        <p class="mt-1 text-xs text-slate-400">Proposed by {{ action.proposed_by.name }}</p>
+                        <p class="mt-1 text-xs text-slate-500">Proposed by {{ action.proposed_by.name }}</p>
                     </div>
                     {% if action.status == 'PROPOSED' %}
                     <div class="flex gap-2">

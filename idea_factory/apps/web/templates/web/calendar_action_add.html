@@ -1,8 +1,11 @@
 {% extends "base.html" %}
+{% load web_extras %}
 
 {% block title %}Add Action - {{ company.name }}{% endblock %}
 
 {% block content %}
+{% guide_hint title="Add a calendar action" body="Use a short title and optional description. Pick a date on or after company start. You can update status and notes from the day view later." %}
+
 <div class="mb-4">
     <a href="{% url 'company_calendar' company_pk=company.pk %}" class="text-sm text-indigo-600 hover:text-indigo-800">← Calendar</a>
     <h1 class="text-xl font-bold text-slate-900 mt-1">Add Action</h1>

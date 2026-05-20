@@ -1,15 +1,17 @@
 {% extends "base.html" %}
+{% load web_extras %}
 
 {% block title %}Chat with {{ agent.name }} - {{ company.name }}{% endblock %}
 
 {% block content %}
-<div class="mb-4 flex justify-between items-center">
-    <div>
-        <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:text-indigo-800">← {{ company.name }}</a>
-        <h1 class="text-xl font-bold text-slate-900 mt-1">Chat with {{ agent.name }}</h1>
-        <p class="text-sm text-slate-500">{{ agent.get_role_display }}</p>
-    </div>
+<div class="mb-4">
+    <a href="{% url 'company_detail' pk=company.pk %}" class="link-back">← {{ company.name }}</a>
+    <h1 class="text-xl font-bold text-slate-900 mt-1">Chat with {{ agent.name }}</h1>
+    <p class="text-sm text-slate-600">{{ agent.get_role_display }}</p>
 </div>
+
+{% agent_chat_examples agent as chat_examples %}
+{% guide_hint title="What to ask here" body="Ask one clear question at a time about this company. {{ agent.name }} answers from the company context, idea pipeline, and their role. You can send follow-ups in the same thread." examples=chat_examples fill_input_id="chat-content" %}
 
 <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[500px]">
     <div class="flex-1 overflow-y-auto p-6 space-y-4" id="chat-messages">
@@ -31,22 +33,35 @@
             {% endif %}
         </div>
         {% empty %}
-        <p class="text-slate-500 text-center py-8">No messages yet. Ask {{ agent.name }} about company state, plans, or tasks.</p>
+        <p class="text-slate-600 text-center py-6">No messages yet. Type a question below or click an example above to fill the input.</p>
         {% endfor %}
     </div>
     <div class="border-t border-slate-200 p-4">
+        <p class="text-xs text-slate-500 mb-2" id="chat-input-hint">Press Send after your question. Be specific about timeframe, budget, or decisions you need.</p>
         <form method="post" action="{% url 'agent_chat_send' company_pk=company.pk agent_pk=agent.pk %}">
             {% csrf_token %}
             <div class="flex gap-2">
-                <input type="text" name="content" placeholder="Ask {{ agent.name }}..." required
-                    class="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                <input type="text" name="content" id="chat-content" required
+                    class="form-control flex-1 min-w-0"
+                    placeholder="e.g. What should we prioritize this week?"
+                    aria-describedby="chat-input-hint"
                     aria-label="Your message to {{ agent.name }}">
-                <button type="submit"
-                    class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
-                    Send
-                </button>
+                <button type="submit" class="btn-primary shrink-0">Send</button>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+(function () {
+    const input = document.getElementById('chat-content');
+    if (!input) return;
+    document.querySelectorAll('[data-fill-chat]').forEach(function (el) {
+        el.addEventListener('click', function () {
+            input.value = el.getAttribute('data-fill-chat');
+            input.focus();
+        });
+    });
+})();
+</script>
 {% endblock %}

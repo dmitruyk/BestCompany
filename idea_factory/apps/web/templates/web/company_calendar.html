@@ -5,6 +5,8 @@
 
 {% block content %}
 {% load static %}
+{% guide_hint title="How to use the calendar" body="Click a day to see scheduled actions. Use + Add Action for manual tasks. Colored chips show status: planned (amber), in progress (blue), done (green). Selected director actions appear here after you schedule them." %}
+
 <div class="mb-4 flex justify-between items-center">
     <div>
         <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:text-indigo-800">← {{ company.name }}</a>
@@ -29,7 +31,8 @@
     </div>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+<div class="table-scroll">
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-w-[560px]">
     <table class="min-w-full">
         <thead class="bg-slate-50">
             <tr>
@@ -78,5 +81,6 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
 </div>
 {% endblock %}

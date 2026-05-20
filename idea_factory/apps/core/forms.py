@@ -7,24 +7,27 @@ from apps.core.models import ServiceLLMConfig
 
 User = get_user_model()
 
+_INPUT_CLASS = (
+    "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 "
+    "shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+)
+_CHECKBOX_CLASS = (
+    "h-4 w-4 rounded border border-slate-300 text-indigo-600 "
+    "focus:ring-2 focus:ring-indigo-500"
+)
+
 
 class AppLoginForm(AuthenticationForm):
     """Login form for the main Idea Factory UI."""
 
     username = forms.CharField(
         widget=forms.TextInput(
-            attrs={
-                "class": "w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500",
-                "autocomplete": "username",
-            }
+            attrs={"class": _INPUT_CLASS, "autocomplete": "username"}
         )
     )
     password = forms.CharField(
         widget=forms.PasswordInput(
-            attrs={
-                "class": "w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500",
-                "autocomplete": "current-password",
-            }
+            attrs={"class": _INPUT_CLASS, "autocomplete": "current-password"}
         )
     )
 
@@ -35,19 +38,13 @@ class ForcePasswordChangeForm(forms.Form):
     new_password1 = forms.CharField(
         label="New password",
         widget=forms.PasswordInput(
-            attrs={
-                "class": "w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500",
-                "autocomplete": "new-password",
-            }
+            attrs={"class": _INPUT_CLASS, "autocomplete": "new-password"}
         ),
     )
     new_password2 = forms.CharField(
         label="Confirm new password",
         widget=forms.PasswordInput(
-            attrs={
-                "class": "w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500",
-                "autocomplete": "new-password",
-            }
+            attrs={"class": _INPUT_CLASS, "autocomplete": "new-password"}
         ),
     )
 
@@ -92,12 +89,6 @@ class AdminHumanUserCreationForm(UserCreationForm):
                 ]
             )
         return user
-
-
-_INPUT_CLASS = (
-    "w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-)
-_CHECKBOX_CLASS = "rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
 
 
 class AppUserCreationForm(forms.Form):
@@ -286,27 +277,14 @@ class ServiceLLMConfigForm(forms.ModelForm):
             "openai_model_id",
         )
         widgets = {
-            "default_provider": forms.Select(
-                attrs={
-                    "class": "w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                }
-            ),
+            "default_provider": forms.Select(attrs={"class": _INPUT_CLASS}),
             "ollama_host": forms.URLInput(
-                attrs={
-                    "class": "w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500",
-                    "placeholder": "http://localhost:11434",
-                }
+                attrs={"class": _INPUT_CLASS, "placeholder": "http://localhost:11434"}
             ),
             "ollama_model_id": forms.TextInput(
-                attrs={
-                    "class": "w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500",
-                    "placeholder": "gpt-oss:20b",
-                }
+                attrs={"class": _INPUT_CLASS, "placeholder": "gpt-oss:20b"}
             ),
             "openai_model_id": forms.TextInput(
-                attrs={
-                    "class": "w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500",
-                    "placeholder": "gpt-4o-mini",
-                }
+                attrs={"class": _INPUT_CLASS, "placeholder": "gpt-4o-mini"}
             ),
         }

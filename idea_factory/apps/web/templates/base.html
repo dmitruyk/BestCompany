@@ -19,43 +19,76 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style type="text/tailwindcss">
+        @layer components {
+            .form-control {
+                @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm
+                    focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500;
+            }
+            .btn {
+                @apply inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2;
+            }
+            .btn-primary {
+                @apply btn bg-indigo-600 text-white hover:bg-indigo-700;
+            }
+            .btn-secondary {
+                @apply btn border border-slate-300 text-slate-700 bg-white hover:bg-slate-50;
+            }
+            .link-nav {
+                @apply text-sm font-medium text-slate-600 hover:text-indigo-600
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded;
+            }
+            .link-back {
+                @apply text-sm font-medium text-indigo-600 hover:text-indigo-800
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded;
+            }
+            .table-scroll {
+                @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0;
+            }
+        }
+    </style>
 </head>
-<body class="bg-slate-50 font-sans text-slate-800 min-h-screen">
-    <nav class="bg-white border-b border-slate-200 shadow-sm">
+<body class="bg-slate-50 font-sans text-base text-slate-900 antialiased min-h-screen">
+    <a href="#main-content"
+        class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:rounded-lg focus:shadow-lg focus:text-indigo-600 focus:font-medium">
+        Skip to main content
+    </a>
+    <nav class="bg-white border-b border-slate-200 shadow-sm" aria-label="Main navigation">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-14 items-center">
-                <a href="{% url 'home' %}" class="text-lg font-semibold text-slate-800 hover:text-indigo-600">
+            <div class="flex flex-wrap justify-between gap-y-2 min-h-14 py-2 items-center">
+                <a href="{% url 'home' %}"
+                    class="text-lg font-semibold text-slate-900 hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded">
                     Idea Factory
                 </a>
-                <div class="flex items-center gap-4">
-                    <a href="{% url 'company_list' %}" class="text-sm font-medium text-slate-600 hover:text-indigo-600">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <a href="{% url 'company_list' %}" class="link-nav">
                         {% if is_app_admin %}Companies{% else %}My Companies{% endif %}
                     </a>
                     {% if can_create_ideas %}
-                    <a href="{% url 'new_idea' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                        New Request
-                    </a>
+                    <a href="{% url 'new_idea' %}" class="link-nav text-indigo-600 hover:text-indigo-800">New Request</a>
                     {% endif %}
                     {% if user.is_authenticated %}
-                        <span class="text-sm text-slate-500">{{ user.username }}</span>
+                        <span class="text-sm text-slate-600 hidden sm:inline" aria-label="Signed in as">{{ user.username }}</span>
                         {% if is_app_admin %}
-                        <a href="{% url 'user_list' %}" class="text-sm text-slate-500 hover:text-slate-700">Users</a>
-                        <a href="{% url 'llm_settings' %}" class="text-sm text-slate-500 hover:text-slate-700">LLM</a>
-                        <a href="{% url 'admin:index' %}" class="text-sm text-slate-500 hover:text-slate-700">Admin</a>
+                        <a href="{% url 'user_list' %}" class="link-nav">Users</a>
+                        <a href="{% url 'llm_settings' %}" class="link-nav">LLM</a>
+                        <a href="{% url 'admin:index' %}" class="link-nav">Admin</a>
                         {% endif %}
-                        <a href="{% url 'app_logout' %}" class="text-sm text-slate-500 hover:text-slate-700">Logout</a>
+                        <a href="{% url 'app_logout' %}" class="link-nav">Logout</a>
                     {% else %}
-                        <a href="{% url 'app_login' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">Login</a>
+                        <a href="{% url 'app_login' %}" class="link-nav text-indigo-600 hover:text-indigo-800">Login</a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </nav>
-    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main id="main-content" class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {% if messages %}
-            <div class="mb-4 space-y-2">
+            <div class="mb-6 space-y-2" aria-live="polite">
                 {% for message in messages %}
-                    <div class="rounded-lg px-4 py-2 text-sm {% if message.tags == 'error' %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                    <div role="alert"
+                        class="rounded-lg px-4 py-3 text-sm font-medium {% if message.tags == 'error' %}bg-red-50 text-red-900 border border-red-200{% else %}bg-emerald-50 text-emerald-900 border border-emerald-200{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}

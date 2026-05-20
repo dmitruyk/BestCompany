@@ -1,9 +1,24 @@
 {% extends "base.html" %}
+{% load web_extras %}
 
 {% block title %}{{ idea.title }} - Idea Factory{% endblock %}
 
 {% block content %}
-<div class="mb-6 flex justify-between items-start">
+{% if idea.status == 'RUNNING' %}
+{% guide_hint title="Pipeline running" body="AI agents are analyzing your request. This page refreshes automatically. Use Stop if you need to cancel. When status becomes Succeeded, you can start developing a company." %}
+{% elif idea.status == 'SUCCEEDED' and idea.development_status == 'NOT_STARTED' and can_create_companies %}
+{% guide_hint title="Ready for the next step" body="Review the final summary and agent runs below. When satisfied, click Start Developing to generate your company agent fleet (CPA, Directors, Marketer, and more)." %}
+{% elif idea.development_status == 'GENERATING_FLEET' %}
+{% guide_hint title="Generating agent fleet" body="Your company is being set up. This page refreshes when the fleet is ready. Then open the company to chat with agents and start director discussions." %}
+{% elif idea.development_status == 'READY' and idea.company %}
+{% guide_hint title="Company is ready" body="Click Open Company to chat with agents, run director discussions, and manage actions on the calendar." %}
+{% elif idea.status == 'FAILED' %}
+{% guide_hint title="Pipeline failed" body="Check agent runs below for errors. Use Rerun failed steps or Rerun from scratch after fixing provider settings or your prompt." %}
+{% else %}
+{% guide_hint title="Review this request" body="Expand agent runs to inspect outputs. Download JSON for offline review, or rerun the pipeline if you added PDFs or changed settings." %}
+{% endif %}
+
+<div class="mb-6 flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-start">
     <div>
         <h1 class="text-2xl font-bold text-slate-900">{{ idea.title }}</h1>
         <p class="mt-1 text-slate-500">Created {{ idea.created_at|date:"M d, Y H:i" }} · {{ idea.get_provider_display }}{% if idea.model_id %} · {{ idea.model_id }}{% endif %}</p>

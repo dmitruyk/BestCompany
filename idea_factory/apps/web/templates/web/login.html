@@ -5,7 +5,7 @@
 {% block content %}
 <div class="max-w-md mx-auto">
     <h1 class="text-2xl font-bold text-slate-900 mb-2">Sign in</h1>
-    <p class="text-sm text-slate-500 mb-6">Use the account created by your administrator.</p>
+    <p class="text-sm text-slate-600 mb-6">Sign in with the username and default password from your administrator. You will be asked to set a new password on first login.</p>
 
     {% if form.non_field_errors %}
     <div class="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
@@ -25,7 +25,7 @@
             {{ form.password }}
             {% if form.password.errors %}<p class="text-sm text-red-600 mt-1">{{ form.password.errors.0 }}</p>{% endif %}
         </div>
-        <button type="submit" class="w-full inline-flex justify-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+        <button type="submit" class="btn-primary w-full">
             Sign in
         </button>
     </form>

@@ -25,7 +25,15 @@ Copy `.env.example` to `.env` and load with `python-dotenv` or your preferred me
 
 ## Docker / registry deployment
 
-`make build-docker` copies your local `idea_factory/.env` into the image. The entrypoint loads `/app/.env` before migrations.
+`make build-docker` copies your local `idea_factory/.env` into the image. The entrypoint loads `/app/.env`, then on each container start:
+
+1. Waits for PostgreSQL (`DB_WAIT_ATTEMPTS` / `DB_WAIT_DELAY`, optional)
+2. `migrate --noinput` — applies migrations committed in the repo
+3. `collectstatic --noinput` — also run at image build
+4. `ensure_default_admin`
+5. Starts gunicorn
+
+**Note:** `makemigrations` is for local development only (`make makemigrations`). Do not run it in production containers; create migration files locally, commit them, then rebuild/redeploy.
 
 1. Edit `idea_factory/.env` (DB, secrets, `ALLOWED_HOSTS` including deploy host).
 2. Build and push:

@@ -1,12 +1,21 @@
 {% extends "base.html" %}
+{% load web_extras %}
 
 {% block title %}Idea Factory - Home{% endblock %}
 
 {% block content %}
+{% guide_hint title="How Idea Factory works" body="Submit a business idea as a request. AI agents analyze it and produce a summary. When status is Succeeded, accept the idea to create a company with CPA, Directors, Marketer, and other agents." %}
+
+{% if can_create_ideas %}
+{% guide_hint title="Your next action" body="Create a new request with a clear problem, target customer, and constraints. After the pipeline succeeds, open the idea and click Start Developing to spawn your company." %}
+{% else %}
+{% guide_hint title="Your next action" body="Open an idea from the list below to review agent output. When development is ready, open the linked company to chat with agents and run director discussions." %}
+{% endif %}
+
 <div class="flex justify-between items-center mb-8">
     <h1 class="text-2xl font-bold text-slate-900">Idea Requests</h1>
     {% if can_create_ideas %}
-    <a href="{% url 'new_idea' %}" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+    <a href="{% url 'new_idea' %}" class="btn-primary">
         + New Request
     </a>
     {% endif %}
@@ -30,7 +39,8 @@
 </div>
 {% endif %}
 
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+<div class="table-scroll">
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-w-[640px]">
     <table class="min-w-full divide-y divide-slate-200">
         <thead class="bg-slate-50">
             <tr>
@@ -79,5 +89,6 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
 </div>
 {% endblock %}

@@ -18,9 +18,11 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY .env .env
 COPY . .
 
+# Bake static assets into the image; entrypoint runs collectstatic again on start.
 RUN python manage.py collectstatic --noinput
 
-RUN chmod +x docker-entrypoint.sh
+RUN mkdir -p media logs \
+    && chmod +x docker-entrypoint.sh
 
 EXPOSE 8000
 
