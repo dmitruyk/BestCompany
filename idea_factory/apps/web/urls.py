@@ -1,7 +1,14 @@
 """URL configuration for web app."""
 from django.urls import path
 
-from . import auth_views, google_calendar_views, llm_settings_views, user_views, views
+from . import (
+    auth_views,
+    company_planning_views,
+    google_calendar_views,
+    llm_settings_views,
+    user_views,
+    views,
+)
 
 urlpatterns = [
     path("login/", auth_views.app_login, name="app_login"),
@@ -58,6 +65,11 @@ urlpatterns = [
     path("companies/<uuid:pk>/status/", views.company_status, name="company_status"),
     path("companies/<uuid:company_pk>/agents/<uuid:agent_pk>/chat/", views.company_agent_chat, name="company_agent_chat"),
     path("companies/<uuid:company_pk>/agents/<uuid:agent_pk>/chat/send/", views.agent_chat_send, name="agent_chat_send"),
+    path(
+        "companies/<uuid:company_pk>/agents/<uuid:agent_pk>/chat/messages/<uuid:message_pk>/status/",
+        views.agent_chat_message_status,
+        name="agent_chat_message_status",
+    ),
     path("companies/<uuid:company_pk>/discussions/new/", views.start_discussion, name="start_discussion"),
     path("companies/<uuid:company_pk>/discussions/<uuid:discussion_pk>/", views.director_discussion_detail, name="director_discussion_detail"),
     path("companies/<uuid:company_pk>/discussions/<uuid:discussion_pk>/rerun/", views.rerun_discussion, name="rerun_discussion"),
@@ -69,4 +81,33 @@ urlpatterns = [
     path("companies/<uuid:company_pk>/calendar/add/", views.calendar_action_add, name="calendar_action_add"),
     path("companies/<uuid:company_pk>/calendar/<int:year>/<int:month>/<int:day>/", views.company_calendar_date, name="company_calendar_date"),
     path("companies/<uuid:company_pk>/calendar/entry/<uuid:entry_pk>/status/", views.calendar_action_update_status, name="calendar_action_update_status"),
+    path("companies/<uuid:company_pk>/tasks/", company_planning_views.company_tasks, name="company_tasks"),
+    path(
+        "companies/<uuid:company_pk>/tasks/<uuid:task_pk>/",
+        company_planning_views.company_task_detail,
+        name="company_task_detail",
+    ),
+    path(
+        "companies/<uuid:company_pk>/tasks/<uuid:task_pk>/escalate/",
+        company_planning_views.company_task_escalate,
+        name="company_task_escalate",
+    ),
+    path("companies/<uuid:company_pk>/planning/", company_planning_views.company_planning, name="company_planning"),
+    path(
+        "companies/<uuid:company_pk>/planning/start/",
+        company_planning_views.company_planning_start,
+        name="company_planning_start",
+    ),
+    path(
+        "companies/<uuid:company_pk>/planning/<uuid:session_pk>/",
+        company_planning_views.company_planning_detail,
+        name="company_planning_detail",
+    ),
+    path(
+        "companies/<uuid:company_pk>/planning/<uuid:session_pk>/status/",
+        company_planning_views.planning_session_status,
+        name="planning_session_status",
+    ),
+    path("companies/<uuid:company_pk>/direction/", company_planning_views.company_direction, name="company_direction"),
+    path("companies/<uuid:company_pk>/history/", company_planning_views.company_history, name="company_history"),
 ]

@@ -66,6 +66,26 @@ Run the autonomous loop via cron:
 
 Toggle autonomous mode per company from the company detail page (🤖 Self-Run / 👤 Manual).
 
+## Weekly Planning & Tasks
+
+Companies use structured planning separate from the calendar:
+
+1. **Strategic direction** (`CompanyStrategicDirection`): Where the company is heading; mark founder-verified after agreement.
+2. **Planning sessions** (`PlanningSession`): Weekly (Monday) via `run_weekly_planning` or on-demand from the UI. The planner agent reads **high-level context** only (`build_strategic_planning_context`) — direction, milestone summaries, completed task outcomes, open work one-liners.
+3. **Tasks** (`CompanyTask`): Scope from planning with assignee (AI agent or human), status, progress %, dependencies (`CompanyTaskDependency`), and **results** (`result_summary`, `result_notes`) for the next session.
+4. **History** (`CompanyHistoryEntry`): Compact timeline of direction, planning, and task events.
+5. **Progress**: `compute_progress_metrics` on the company detail and task board (completion % and weighted progress).
+
+**Docker ticker** (`idea-factory-ticker` in `docker-compose.yml`) runs `run_company_ticker --loop` each `TICKER_INTERVAL_SECONDS` (default 1h):
+
+1. Activity checks (overdue tasks, stale planning sessions)
+2. `run_autonomous_loop` for Self-Run companies
+3. `run_weekly_planning` on Mondays after `TICKER_WEEKLY_PLANNING_HOUR`
+
+Host cron alternative: `scripts/run_company_ticker.sh` or `make ticker-once`.
+
+UI routes: `/companies/<id>/planning/`, `/tasks/`, `/direction/`, `/history/`.
+
 ## Confidence Scoring
 
 - Base: from model's structured output

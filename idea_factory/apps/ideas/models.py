@@ -437,3 +437,262 @@ class CompanyTeamMember(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.get_role_display()})"
+
+
+class CompanyStrategicDirection(models.Model):
+    """Company development direction — agreed or verified with founders."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="strategic_directions"
+    )
+    statement = models.TextField(
+        help_text="Where the company is heading; used in weekly planning.",
+    )
+    founder_verified = models.BooleanField(
+        default=False,
+        help_text="True when founders have agreed or clarified this direction.",
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_directions",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Only one direction should be active per company.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        preview = (self.statement[:60] + "…") if len(self.statement) > 60 else self.statement
+        return f"{preview} ({'verified' if self.founder_verified else 'draft'})"
+
+
+class PlanningSession(models.Model):
+    """Weekly (Monday) or on-demand planning that produces a task scope."""
+
+    class Trigger(models.TextChoices):
+        WEEKLY = "weekly", "Weekly (Monday)"
+        MANUAL = "manual", "User Request"
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        IN_PROGRESS = "IN_PROGRESS", "In Progress"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="planning_sessions"
+    )
+    trigger = models.CharField(max_length=20, choices=Trigger.choices)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.DRAFT
+    )
+    week_start = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Monday of the planning week, when applicable.",
+    )
+    summary = models.TextField(
+        blank=True,
+        default="",
+        help_text="Outcome summary for directors/managers.",
+    )
+    context_snapshot = models.TextField(
+        blank=True,
+        default="",
+        help_text="High-level context fed into planning (task results, direction).",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="planning_sessions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Planning {self.week_start or self.created_at.date()} ({self.get_status_display()})"
+
+
+class CompanyTask(models.Model):
+    """Assignable work item from planning — agent or human."""
+
+    class Status(models.TextChoices):
+        TODO = "TODO", "To Do"
+        IN_PROGRESS = "IN_PROGRESS", "In Progress"
+        BLOCKED = "BLOCKED", "Blocked"
+        DONE = "DONE", "Done"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    class AssigneeType(models.TextChoices):
+        UNASSIGNED = "unassigned", "Unassigned"
+        AGENT = "agent", "AI Agent"
+        HUMAN = "human", "Human"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="tasks"
+    )
+    planning_session = models.ForeignKey(
+        PlanningSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tasks",
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.TODO
+    )
+    progress_percent = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="0–100 completion estimate.",
+    )
+    assignee_type = models.CharField(
+        max_length=20,
+        choices=AssigneeType.choices,
+        default=AssigneeType.UNASSIGNED,
+    )
+    assigned_agent = models.ForeignKey(
+        CompanyAgent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_tasks",
+    )
+    assigned_human = models.ForeignKey(
+        CompanyTeamMember,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_tasks",
+    )
+    escalated_to_human = models.BooleanField(
+        default=False,
+        help_text="Agent could not complete; reassigned or needs human.",
+    )
+    target_date = models.DateField(null=True, blank=True)
+    calendar_action = models.ForeignKey(
+        CompanyCalendarAction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="linked_tasks",
+    )
+    result_summary = models.TextField(
+        blank=True,
+        default="",
+        help_text="Outcome when done; feeds next planning context.",
+    )
+    result_notes = models.TextField(
+        blank=True,
+        default="",
+        help_text="Attachments, links, or extra detail for the result.",
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.get_status_display()})"
+
+    @property
+    def is_blocked_by_dependencies(self) -> bool:
+        """True if any prerequisite task is not done."""
+        deps = self.dependencies.select_related("depends_on").all()
+        return any(
+            d.depends_on.status not in (self.Status.DONE, self.Status.CANCELLED)
+            for d in deps
+        )
+
+
+class CompanyTaskDependency(models.Model):
+    """Task B depends on task A (A must complete before B can proceed)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    task = models.ForeignKey(
+        CompanyTask,
+        on_delete=models.CASCADE,
+        related_name="dependencies",
+    )
+    depends_on = models.ForeignKey(
+        CompanyTask,
+        on_delete=models.CASCADE,
+        related_name="dependents",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task", "depends_on"],
+                name="unique_task_dependency",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.task.title} depends on {self.depends_on.title}"
+
+
+class CompanyHistoryEntry(models.Model):
+    """Compact audit trail for company actions and task lifecycle."""
+
+    class EntryType(models.TextChoices):
+        DIRECTION_CREATED = "direction_created", "Direction Set"
+        DIRECTION_VERIFIED = "direction_verified", "Direction Verified"
+        PLANNING_STARTED = "planning_started", "Planning Started"
+        PLANNING_COMPLETED = "planning_completed", "Planning Completed"
+        TASK_CREATED = "task_created", "Task Created"
+        TASK_UPDATED = "task_updated", "Task Updated"
+        TASK_COMPLETED = "task_completed", "Task Completed"
+        TASK_ESCALATED = "task_escalated", "Task Escalated to Human"
+        CALENDAR_LINKED = "calendar_linked", "Calendar Linked"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="history_entries"
+    )
+    entry_type = models.CharField(max_length=30, choices=EntryType.choices)
+    title = models.CharField(max_length=255)
+    summary = models.TextField(blank=True, default="")
+    related_task = models.ForeignKey(
+        CompanyTask,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="history_entries",
+    )
+    related_planning_session = models.ForeignKey(
+        PlanningSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="history_entries",
+    )
+    metadata_json = models.TextField(blank=True, default="{}")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name_plural = "Company history entries"
+
+    def __str__(self) -> str:
+        return f"{self.get_entry_type_display()}: {self.title}"

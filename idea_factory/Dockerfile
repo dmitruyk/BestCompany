@@ -22,7 +22,7 @@ COPY . .
 RUN python manage.py collectstatic --noinput
 
 RUN mkdir -p media logs \
-    && chmod +x docker-entrypoint.sh
+    && chmod +x docker-entrypoint.sh docker-entrypoint-ticker.sh scripts/run_company_ticker.sh
 
 EXPOSE 8000
 

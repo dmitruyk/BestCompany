@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load web_extras %}
+
+{% block title %}Planning - {{ company.name }}{% endblock %}
+
+{% block content %}
+{% guide_hint title="Weekly planning" body="Run planning each Monday or anytime you need a new task scope. The planner uses high-level context (direction, completed results, open work) — not full task dumps. Directors and managers review tasks on the Tasks board." %}
+
+<header class="mb-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
+    <div>
+        <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">← {{ company.name }}</a>
+        <h1 class="text-2xl font-bold text-slate-900 mt-1">Planning</h1>
+        <p class="text-sm text-slate-600 mt-1">Week of {{ week_start|date:"l, F j, Y" }} · progress {{ progress.weighted_progress_percent }}%</p>
+    </div>
+    <form method="post" action="{% url 'company_planning_start' company_pk=company.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-primary" {% if company.status != 'ACTIVE' %}disabled{% endif %}>Start planning now</button>
+    </form>
+</header>
+
+{% if direction %}
+<div class="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+    <span class="font-medium text-slate-800">Direction</span>
+    {% if direction.founder_verified %}<span class="text-emerald-700">(verified)</span>{% endif %}
+    <p class="text-slate-600 mt-1">{{ direction.statement|truncatewords:50 }}</p>
+    <a href="{% url 'company_direction' company_pk=company.pk %}" class="text-indigo-600 text-xs hover:underline mt-2 inline-block">Edit direction</a>
+</div>
+{% else %}
+<p class="mb-6 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+    <a href="{% url 'company_direction' company_pk=company.pk %}" class="font-medium underline">Set strategic direction</a> with founders before planning.
+</p>
+{% endif %}
+
+<h2 class="text-lg font-semibold text-slate-900 mb-3">Sessions</h2>
+<div class="space-y-2">
+    {% for session in sessions %}
+    <a href="{% url 'company_planning_detail' company_pk=company.pk session_pk=session.pk %}"
+        class="block bg-white rounded-xl border border-slate-200 p-4 hover:border-indigo-300">
+        <div class="flex justify-between items-center">
+            <span class="font-medium text-slate-900">{{ session.get_trigger_display }} · {{ session.week_start|date:"M j, Y"|default:session.created_at|date:"M j, Y" }}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full
+                {% if session.status == 'COMPLETED' %}bg-green-100 text-green-800
+                {% elif session.status == 'IN_PROGRESS' %}bg-blue-100 text-blue-800
+                {% elif session.status == 'FAILED' %}bg-red-100 text-red-800
+                {% else %}bg-slate-100 text-slate-600{% endif %}">{{ session.get_status_display }}</span>
+        </div>
+        {% if session.summary %}<p class="text-sm text-slate-600 mt-1 line-clamp-2">{{ session.summary|truncatewords:30 }}</p>{% endif %}
+    </a>
+    {% empty %}
+    <p class="text-slate-500">No planning sessions yet.</p>
+    {% endfor %}
+</div>
+
+<p class="mt-6 text-xs text-slate-500">Automated via Docker <code class="bg-slate-100 px-1 rounded">idea-factory-ticker</code> (Mondays) or <code class="bg-slate-100 px-1 rounded">make ticker-once</code>.</p>
+{% endblock %}

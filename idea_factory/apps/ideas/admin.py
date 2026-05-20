@@ -7,12 +7,17 @@ from .models import (
     Company,
     CompanyAgent,
     CompanyCalendarAction,
+    CompanyHistoryEntry,
+    CompanyStrategicDirection,
+    CompanyTask,
+    CompanyTaskDependency,
     CompanyTeamMember,
     DirectorDiscussion,
     DiscussionMessage,
     IdeaAttachment,
     IdeaConclusion,
     IdeaRequest,
+    PlanningSession,
     UserAgentMessage,
 )
 
@@ -125,3 +130,32 @@ class CompanyTeamMemberAdmin(admin.ModelAdmin):
 class CompanyCalendarActionAdmin(admin.ModelAdmin):
     list_display = ("title", "company", "action_date", "status", "created_at")
     list_filter = ("status", "action_date")
+
+
+@admin.register(CompanyStrategicDirection)
+class CompanyStrategicDirectionAdmin(admin.ModelAdmin):
+    list_display = ("company", "founder_verified", "is_active", "created_at")
+    list_filter = ("founder_verified", "is_active")
+
+
+@admin.register(PlanningSession)
+class PlanningSessionAdmin(admin.ModelAdmin):
+    list_display = ("company", "trigger", "week_start", "status", "created_at")
+    list_filter = ("trigger", "status")
+
+
+@admin.register(CompanyTask)
+class CompanyTaskAdmin(admin.ModelAdmin):
+    list_display = ("title", "company", "status", "assignee_type", "progress_percent", "target_date")
+    list_filter = ("status", "assignee_type")
+
+
+@admin.register(CompanyTaskDependency)
+class CompanyTaskDependencyAdmin(admin.ModelAdmin):
+    list_display = ("task", "depends_on")
+
+
+@admin.register(CompanyHistoryEntry)
+class CompanyHistoryEntryAdmin(admin.ModelAdmin):
+    list_display = ("company", "entry_type", "title", "created_at")
+    list_filter = ("entry_type",)

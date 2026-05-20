@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load web_extras %}
+
+{% block title %}Tasks - {{ company.name }}{% endblock %}
+
+{% block content %}
+<header class="mb-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
+    <div>
+        <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">← {{ company.name }}</a>
+        <h1 class="text-2xl font-bold text-slate-900 mt-1">Tasks</h1>
+        <p class="text-sm text-slate-600 mt-1">
+            {{ progress.done_count }} done · {{ progress.in_progress_count }} in progress · {{ progress.blocked_count }} blocked
+            · overall {{ progress.weighted_progress_percent }}%
+        </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a href="{% url 'company_planning' company_pk=company.pk %}" class="btn-primary">Planning</a>
+        <a href="{% url 'company_direction' company_pk=company.pk %}" class="btn-secondary">Direction</a>
+    </div>
+</header>
+
+<nav class="mb-4 flex flex-wrap gap-2" aria-label="Filter by status">
+    <a href="{% url 'company_tasks' company_pk=company.pk %}"
+        class="px-3 py-1 rounded-full text-sm {% if not status_filter %}bg-indigo-100 text-indigo-800{% else %}bg-slate-100 text-slate-600{% endif %}">All</a>
+    {% for value, label in status_choices %}
+    <a href="{% url 'company_tasks' company_pk=company.pk %}?status={{ value }}"
+        class="px-3 py-1 rounded-full text-sm {% if status_filter == value %}bg-indigo-100 text-indigo-800{% else %}bg-slate-100 text-slate-600{% endif %}">{{ label }}</a>
+    {% endfor %}
+</nav>
+
+<div class="space-y-3" role="list" aria-label="Company tasks">
+    {% for task in tasks %}
+    <article class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-indigo-200" role="listitem">
+        <div class="flex flex-col sm:flex-row sm:justify-between gap-3">
+            <div class="min-w-0 flex-1">
+                <a href="{% url 'company_task_detail' company_pk=company.pk task_pk=task.pk %}" class="font-semibold text-slate-900 hover:text-indigo-700">{{ task.title }}</a>
+                <p class="text-sm text-slate-600 mt-1 line-clamp-2">{{ task.description|truncatewords:40 }}</p>
+                {% if task.dependencies.all %}
+                <p class="text-xs text-slate-500 mt-2">
+                    Depends on:
+                    {% for dep in task.dependencies.all %}
+                    <span class="inline-flex px-1.5 py-0.5 rounded bg-slate-100">{{ dep.depends_on.title }}</span>
+                    {% endfor %}
+                    {% if task.is_blocked_by_dependencies %}<span class="text-amber-700 font-medium">· blocked</span>{% endif %}
+                </p>
+                {% endif %}
+            </div>
+            <div class="flex flex-col items-end gap-2 shrink-0 text-sm">
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                    {% if task.status == 'DONE' %}bg-green-100 text-green-800
+                    {% elif task.status == 'IN_PROGRESS' %}bg-blue-100 text-blue-800
+                    {% elif task.status == 'BLOCKED' %}bg-amber-100 text-amber-800
+                    {% else %}bg-slate-100 text-slate-700{% endif %}">
+                    {{ task.get_status_display }}
+                </span>
+                <div class="w-32 h-2 bg-slate-100 rounded-full overflow-hidden" role="progressbar" aria-valuenow="{{ task.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="h-full bg-indigo-500 rounded-full" style="width: {{ task.progress_percent }}%"></div>
+                </div>
+                <span class="text-slate-500 text-xs">
+                    {% if task.assigned_agent %}{{ task.assigned_agent.name }} (AI)
+                    {% elif task.assigned_human %}{{ task.assigned_human.name }} (human)
+                    {% else %}Unassigned{% endif %}
+                    {% if task.escalated_to_human %} · escalated{% endif %}
+                </span>
+                {% if task.target_date %}<time class="text-xs text-slate-400" datetime="{{ task.target_date|date:'Y-m-d' }}">Due {{ task.target_date|date:"M j" }}</time>{% endif %}
+            </div>
+        </div>
+    </article>
+    {% empty %}
+    <p class="text-slate-500 p-6 bg-white rounded-xl border border-slate-200">
+        No tasks yet. <a href="{% url 'company_planning' company_pk=company.pk %}" class="text-indigo-600 hover:underline">Run a planning session</a> to generate a weekly scope.
+    </p>
+    {% endfor %}
+</div>
+{% endblock %}

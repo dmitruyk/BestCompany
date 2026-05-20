@@ -233,3 +233,46 @@ class ResultCheckOutput(BaseModel):
         description="Topic for follow-up discussion if needs_improvement",
     )
     summary: str = Field(default="", description="Brief evaluation summary")
+
+
+class PlannedTaskItem(BaseModel):
+    """Single task proposed during a planning session."""
+
+    title: str = Field(description="Short task title")
+    description: str = Field(default="", description="What to accomplish")
+    suggested_role: str = Field(
+        default="planner",
+        description=(
+            "Agent role to assign: founder, director, planner, qa, cpa, "
+            "marketer, developer, product, operations; or 'human' for team"
+        ),
+    )
+    depends_on_indices: list[int] = Field(
+        default_factory=list,
+        description="0-based indices of other tasks in this plan that must finish first",
+    )
+    target_days_offset: int = Field(
+        default=7,
+        ge=0,
+        le=90,
+        description="Days from week start to target completion",
+    )
+
+
+class PlanningSessionOutput(BaseModel):
+    """Output from planner agent for a planning session."""
+
+    session_summary: str = Field(
+        default="",
+        description="High-level summary for directors and managers",
+    )
+    progress_assessment: str = Field(
+        default="",
+        description="Where the company is vs strategic direction and milestones",
+    )
+    tasks: list[PlannedTaskItem] = Field(
+        default_factory=list,
+        description="3–12 concrete tasks for the week",
+        min_length=1,
+        max_length=15,
+    )

@@ -16,37 +16,48 @@
 <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[500px]">
     <div class="flex-1 overflow-y-auto p-6 space-y-4" id="chat-messages">
         {% for msg in messages %}
-        <div class="space-y-2">
+        <div class="chat-exchange space-y-2" data-message-id="{{ msg.id }}">
             <div class="flex justify-end">
                 <div class="max-w-[85%] rounded-lg bg-indigo-100 text-indigo-900 px-4 py-2">
                     <p class="text-sm font-medium text-indigo-800 mb-1">You</p>
-                    <p class="whitespace-pre-wrap text-sm">{{ msg.user_content }}</p>
+                    <p class="whitespace-pre-wrap text-sm chat-user-text">{{ msg.user_content }}</p>
                 </div>
             </div>
             {% if msg.agent_response %}
-            <div class="flex justify-start">
+            <div class="flex justify-start chat-agent-reply">
                 <div class="max-w-[85%] rounded-lg bg-slate-100 text-slate-800 px-4 py-2">
                     <p class="text-sm font-medium text-slate-700 mb-1">{{ agent.name }}</p>
-                    <p class="whitespace-pre-wrap text-sm">{{ msg.agent_response }}</p>
+                    <p class="whitespace-pre-wrap text-sm chat-agent-text">{{ msg.agent_response }}</p>
+                </div>
+            </div>
+            {% else %}
+            <div class="flex justify-start chat-agent-pending" aria-live="polite">
+                <div class="max-w-[85%] rounded-lg bg-slate-50 text-slate-600 px-4 py-2 border border-slate-200">
+                    <p class="text-sm font-medium text-slate-700 mb-1">{{ agent.name }}</p>
+                    <p class="text-sm text-slate-500 animate-pulse">Thinking…</p>
                 </div>
             </div>
             {% endif %}
         </div>
         {% empty %}
-        <p class="text-slate-600 text-center py-6">No messages yet. Type a question below or click an example above to fill the input.</p>
+        <p class="text-slate-600 text-center py-6" id="chat-empty">No messages yet. Type a question below or click an example above to fill the input.</p>
         {% endfor %}
     </div>
     <div class="border-t border-slate-200 p-4">
-        <p class="text-xs text-slate-500 mb-2" id="chat-input-hint">Press Send after your question. Be specific about timeframe, budget, or decisions you need.</p>
-        <form method="post" action="{% url 'agent_chat_send' company_pk=company.pk agent_pk=agent.pk %}">
+        <p class="text-xs text-slate-500 mb-2" id="chat-input-hint">
+            {% if chat_pending %}Waiting for {{ agent.name }} to respond…{% else %}Press Send after your question. Be specific about timeframe, budget, or decisions you need.{% endif %}
+        </p>
+        <p class="text-xs text-red-600 mb-2 hidden" id="chat-error" role="alert"></p>
+        <form method="post" action="{% url 'agent_chat_send' company_pk=company.pk agent_pk=agent.pk %}" id="chat-form">
             {% csrf_token %}
             <div class="flex gap-2">
                 <input type="text" name="content" id="chat-content" required
                     class="form-control flex-1 min-w-0"
                     placeholder="e.g. What should we prioritize this week?"
                     aria-describedby="chat-input-hint"
-                    aria-label="Your message to {{ agent.name }}">
-                <button type="submit" class="btn-primary shrink-0">Send</button>
+                    aria-label="Your message to {{ agent.name }}"
+                    {% if chat_pending %}disabled{% endif %}>
+                <button type="submit" class="btn-primary shrink-0" id="chat-send-btn" {% if chat_pending %}disabled{% endif %}>Send</button>
             </div>
         </form>
     </div>
@@ -54,14 +65,148 @@
 
 <script>
 (function () {
+    const agentName = {{ agent.name|escapejs }};
+    const sendUrl = '{% url "agent_chat_send" company_pk=company.pk agent_pk=agent.pk %}';
+    const statusUrlTemplate = '{% url "agent_chat_message_status" company_pk=company.pk agent_pk=agent.pk message_pk="00000000-0000-0000-0000-000000000000" %}';
+    const messagesEl = document.getElementById('chat-messages');
+    const form = document.getElementById('chat-form');
     const input = document.getElementById('chat-content');
-    if (!input) return;
+    const sendBtn = document.getElementById('chat-send-btn');
+    const hintEl = document.getElementById('chat-input-hint');
+    const errorEl = document.getElementById('chat-error');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    if (!form || !input) return;
+
+    function statusUrl(messageId) {
+        return statusUrlTemplate.replace('00000000-0000-0000-0000-000000000000', messageId);
+    }
+
+    function setWaiting(waiting) {
+        input.disabled = waiting;
+        sendBtn.disabled = waiting;
+        hintEl.textContent = waiting
+            ? 'Waiting for ' + agentName + ' to respond…'
+            : 'Press Send after your question. Be specific about timeframe, budget, or decisions you need.';
+    }
+
+    function showError(msg) {
+        if (!msg) {
+            errorEl.classList.add('hidden');
+            errorEl.textContent = '';
+            return;
+        }
+        errorEl.textContent = msg;
+        errorEl.classList.remove('hidden');
+    }
+
+    function appendExchange(messageId, userContent) {
+        const empty = document.getElementById('chat-empty');
+        if (empty) empty.remove();
+
+        const wrap = document.createElement('div');
+        wrap.className = 'chat-exchange space-y-2';
+        wrap.dataset.messageId = messageId;
+        wrap.innerHTML =
+            '<div class="flex justify-end">' +
+                '<div class="max-w-[85%] rounded-lg bg-indigo-100 text-indigo-900 px-4 py-2">' +
+                    '<p class="text-sm font-medium text-indigo-800 mb-1">You</p>' +
+                    '<p class="whitespace-pre-wrap text-sm chat-user-text"></p>' +
+                '</div>' +
+            '</div>' +
+            '<div class="flex justify-start chat-agent-pending" aria-live="polite">' +
+                '<div class="max-w-[85%] rounded-lg bg-slate-50 text-slate-600 px-4 py-2 border border-slate-200">' +
+                    '<p class="text-sm font-medium text-slate-700 mb-1"></p>' +
+                    '<p class="text-sm text-slate-500 animate-pulse">Thinking…</p>' +
+                '</div>' +
+            '</div>';
+        wrap.querySelector('.chat-user-text').textContent = userContent;
+        wrap.querySelector('.chat-agent-pending .text-slate-700').textContent = agentName;
+        messagesEl.appendChild(wrap);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return wrap;
+    }
+
+    function showAgentResponse(exchangeEl, responseText) {
+        const pending = exchangeEl.querySelector('.chat-agent-pending');
+        if (pending) pending.remove();
+        const reply = document.createElement('div');
+        reply.className = 'flex justify-start chat-agent-reply';
+        reply.innerHTML =
+            '<div class="max-w-[85%] rounded-lg bg-slate-100 text-slate-800 px-4 py-2">' +
+                '<p class="text-sm font-medium text-slate-700 mb-1"></p>' +
+                '<p class="whitespace-pre-wrap text-sm chat-agent-text"></p>' +
+            '</div>';
+        reply.querySelector('.text-slate-700').textContent = agentName;
+        reply.querySelector('.chat-agent-text').textContent = responseText;
+        exchangeEl.appendChild(reply);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function pollMessage(messageId, exchangeEl) {
+        fetch(statusUrl(messageId))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.pending && data.agent_response) {
+                    showAgentResponse(exchangeEl, data.agent_response);
+                    setWaiting(false);
+                    showError('');
+                    return;
+                }
+                setTimeout(function () { pollMessage(messageId, exchangeEl); }, 2000);
+            })
+            .catch(function () {
+                setTimeout(function () { pollMessage(messageId, exchangeEl); }, 5000);
+            });
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const content = input.value.trim();
+        if (!content || input.disabled) return;
+        showError('');
+        setWaiting(true);
+        const formData = new FormData();
+        formData.append('content', content);
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        fetch(sendUrl, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then(function (r) {
+                return r.json().then(function (data) {
+                    if (!r.ok) throw new Error(data.error || 'Send failed');
+                    return data;
+                });
+            })
+            .then(function (data) {
+                input.value = '';
+                const exchangeEl = appendExchange(data.message_id, data.user_content);
+                pollMessage(data.message_id, exchangeEl);
+            })
+            .catch(function (err) {
+                setWaiting(false);
+                showError(err.message || 'Could not send message.');
+            });
+    });
+
     document.querySelectorAll('[data-fill-chat]').forEach(function (el) {
         el.addEventListener('click', function () {
+            if (input.disabled) return;
             input.value = el.getAttribute('data-fill-chat');
             input.focus();
         });
     });
+
+    var pendingExchange = messagesEl.querySelector('.chat-agent-pending');
+    if (pendingExchange) {
+        var exchange = pendingExchange.closest('.chat-exchange');
+        if (exchange && exchange.dataset.messageId) {
+            setWaiting(true);
+            pollMessage(exchange.dataset.messageId, exchange);
+        }
+    }
 })();
 </script>
 {% endblock %}

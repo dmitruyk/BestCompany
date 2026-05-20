@@ -4,84 +4,143 @@
 {% block title %}Calendar - {{ company.name }}{% endblock %}
 
 {% block content %}
-{% load static %}
-{% guide_hint title="How to use the calendar" body="Click a day to see scheduled actions. Use + Add Action for manual tasks. Colored chips show status: planned (amber), in progress (blue), done (green). Selected director actions appear here after you schedule them." %}
+{% guide_hint title="How to use the calendar" body="Tap or click a day to see scheduled actions. Use + Add Action for manual tasks. Colored chips show status: planned (amber), in progress (blue), done (green). Today is highlighted with a ring. Selected director actions appear here after you schedule them." %}
 {% guide_hint title="Google Calendar sync" body="Open Google Calendar in the top menu to connect your account. Scheduled actions sync as all-day events with reminders (for example 1 hour and 1 day before)." %}
 
-<div class="mb-4 flex justify-between items-center">
-    <div>
-        <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:text-indigo-800">← {{ company.name }}</a>
-        <h1 class="text-xl font-bold text-slate-900 mt-1">Calendar</h1>
+<header class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div class="min-w-0">
+        <a href="{% url 'company_detail' pk=company.pk %}" class="link-back">← {{ company.name }}</a>
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 mt-1">Calendar</h1>
+        <p class="mt-1 text-sm text-slate-600">
+            <time datetime="{{ today|date:'Y-m-d' }}">Today: {{ today|date:"l, F j, Y" }}</time>
+        </p>
     </div>
-    <div class="flex gap-2">
+    <nav class="flex flex-wrap items-center gap-2 shrink-0" aria-label="Calendar navigation">
         {% if has_prev %}
         <a href="{% url 'company_calendar' company_pk=company.pk %}?year={{ prev_year }}&month={{ prev_month }}"
-            class="inline-flex px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
+            class="btn-secondary min-w-[2.75rem] px-3"
             aria-label="Previous month">←</a>
         {% else %}
-        <span class="inline-flex px-3 py-1.5 rounded-lg border border-slate-200 text-slate-400 text-sm" aria-label="No earlier months">←</span>
+        <span class="btn-secondary min-w-[2.75rem] px-3 opacity-40 pointer-events-none" aria-disabled="true" aria-label="No earlier months">←</span>
         {% endif %}
-        <span class="px-4 py-2 text-sm font-medium text-slate-700">{{ year }} – {{ month|stringformat:"02d" }}</span>
+        <span class="px-3 py-2 text-sm font-semibold text-slate-800 tabular-nums min-w-[9rem] text-center" aria-live="polite">
+            <span class="hidden sm:inline">{{ month_name }}</span>
+            <span class="sm:hidden">{{ month_name|slice:":3" }}</span>
+            {{ year }}
+        </span>
         <a href="{% url 'company_calendar' company_pk=company.pk %}?year={{ next_year }}&month={{ next_month }}"
-            class="inline-flex px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
+            class="btn-secondary min-w-[2.75rem] px-3"
             aria-label="Next month">→</a>
+        {% if can_go_today and not is_current_month %}
+        <a href="{% url 'company_calendar' company_pk=company.pk %}?year={{ today.year }}&month={{ today.month }}"
+            class="btn-secondary"
+            aria-label="Go to current month">Today</a>
+        {% endif %}
         <a href="{% url 'calendar_action_add' company_pk=company.pk %}"
-            class="inline-flex px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            class="btn-primary w-full sm:w-auto">
             + Add Action
         </a>
-    </div>
+    </nav>
+</header>
+
+<div class="mb-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600" role="list" aria-label="Action status legend">
+    <span class="inline-flex items-center gap-1.5" role="listitem">
+        <span class="h-2.5 w-2.5 rounded-full bg-amber-400" aria-hidden="true"></span> Planned
+    </span>
+    <span class="inline-flex items-center gap-1.5" role="listitem">
+        <span class="h-2.5 w-2.5 rounded-full bg-blue-500" aria-hidden="true"></span> In progress
+    </span>
+    <span class="inline-flex items-center gap-1.5" role="listitem">
+        <span class="h-2.5 w-2.5 rounded-full bg-green-500" aria-hidden="true"></span> Done
+    </span>
+    <span class="inline-flex items-center gap-1.5" role="listitem">
+        <span class="h-6 w-6 rounded-full ring-2 ring-indigo-600 ring-inset inline-flex items-center justify-center text-[10px] font-bold text-indigo-700" aria-hidden="true">•</span> Current day
+    </span>
 </div>
 
-<div class="table-scroll">
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-w-[560px]">
-    <table class="min-w-full">
-        <thead class="bg-slate-50">
-            <tr>
-                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Mon</th>
-                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Tue</th>
-                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Wed</th>
-                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Thu</th>
-                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Fri</th>
-                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Sat</th>
-                <th class="px-2 py-2 text-xs font-medium text-slate-500 uppercase w-[14%]">Sun</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for week in weeks %}
-            <tr class="border-t border-slate-200">
-                {% for d in week %}
-                <td class="p-1 align-top border-l border-slate-100 min-h-[100px] {% if d.month != month %}bg-slate-50 text-slate-400{% endif %} {% if d|date_lt:start_date %}bg-slate-100{% endif %}">
-                    {% if d|date_gte:start_date %}
-                    <a href="{% url 'company_calendar_date' company_pk=company.pk year=d.year month=d.month day=d.day %}"
-                        class="block p-2 rounded-lg hover:bg-indigo-50 min-h-[80px]"
-                        aria-label="View {{ d }}">
-                        <span class="text-sm font-medium {% if d.month != month %}text-slate-400{% else %}text-slate-900{% endif %}">{{ d.day }}</span>
-                        {% with entries=actions_by_date|get_item:d %}
-                        {% if entries %}
-                        <div class="mt-1 space-y-0.5">
-                            {% for entry in entries %}
-                            <span class="block text-xs truncate rounded px-1 py-0.5
-                                {% if entry.status == 'DONE' %}bg-green-100 text-green-800
-                                {% elif entry.status == 'IN_PROGRESS' %}bg-blue-100 text-blue-800
-                                {% else %}bg-amber-100 text-amber-800{% endif %}">
-                                {{ entry.title }}
-                            </span>
-                            {% endfor %}
-                        </div>
+<section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+    aria-label="{{ month_name }} {{ year }} calendar">
+    <div class="grid grid-cols-7 bg-slate-50 border-b border-slate-200" role="row">
+        <div class="py-2 text-center text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide" role="columnheader" scope="col">
+            <span class="md:hidden">M</span><span class="hidden md:inline">Mon</span>
+        </div>
+        <div class="py-2 text-center text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide" role="columnheader" scope="col">
+            <span class="md:hidden">Tu</span><span class="hidden md:inline">Tue</span>
+        </div>
+        <div class="py-2 text-center text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide" role="columnheader" scope="col">
+            <span class="md:hidden">W</span><span class="hidden md:inline">Wed</span>
+        </div>
+        <div class="py-2 text-center text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide" role="columnheader" scope="col">
+            <span class="md:hidden">Th</span><span class="hidden md:inline">Thu</span>
+        </div>
+        <div class="py-2 text-center text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide" role="columnheader" scope="col">
+            <span class="md:hidden">F</span><span class="hidden md:inline">Fri</span>
+        </div>
+        <div class="py-2 text-center text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide" role="columnheader" scope="col">
+            <span class="md:hidden">Sa</span><span class="hidden md:inline">Sat</span>
+        </div>
+        <div class="py-2 text-center text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide" role="columnheader" scope="col">
+            <span class="md:hidden">Su</span><span class="hidden md:inline">Sun</span>
+        </div>
+    </div>
+
+    <div role="grid" class="divide-y divide-slate-200">
+        {% for week in weeks %}
+        <div class="grid grid-cols-7 divide-x divide-slate-100 min-h-[3.5rem] sm:min-h-[5rem] md:min-h-[6.5rem] lg:min-h-[7.5rem]" role="row">
+            {% for d in week %}
+            {% with entries=actions_by_date|get_item:d %}
+            {% with is_today=d|date_eq:today is_clickable=d|date_gte:start_date %}
+            <div role="gridcell"
+                class="relative p-0.5 sm:p-1 {% if d.month != month %}bg-slate-50{% endif %} {% if d|date_lt:start_date %}bg-slate-100{% elif is_today %}bg-indigo-50/60{% endif %}">
+                {% if is_clickable %}
+                <a href="{% url 'company_calendar_date' company_pk=company.pk year=d.year month=d.month day=d.day %}"
+                    class="flex flex-col h-full min-h-[3.25rem] sm:min-h-[4.75rem] md:min-h-[6rem] p-1.5 sm:p-2 rounded-lg transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 {% if is_today %}ring-2 ring-indigo-600 ring-inset{% endif %}"
+                    {% if is_today %}aria-current="date"{% endif %}
+                    aria-label="{{ d|date:'l, F j, Y' }}{% if entries %}, {{ entries|length }} action{{ entries|length|pluralize }}{% endif %}">
+                    <span class="text-xs sm:text-sm font-semibold tabular-nums self-start
+                        {% if is_today %}inline-flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-indigo-600 text-white
+                        {% elif d.month != month %}text-slate-400
+                        {% else %}text-slate-900{% endif %}">
+                        {{ d.day }}
+                    </span>
+                    {% if entries %}
+                    <div class="mt-auto pt-1 flex flex-wrap gap-0.5 md:hidden" aria-hidden="true">
+                        {% for entry in entries|slice:":5" %}
+                        <span class="h-1.5 w-1.5 rounded-full shrink-0
+                            {% if entry.status == 'DONE' %}bg-green-500
+                            {% elif entry.status == 'IN_PROGRESS' %}bg-blue-500
+                            {% else %}bg-amber-400{% endif %}"></span>
+                        {% endfor %}
+                        {% if entries|length > 5 %}
+                        <span class="text-[9px] text-slate-500 leading-none">+{{ entries|length|add:"-5" }}</span>
                         {% endif %}
-                        {% endwith %}
-                    </a>
-                    {% else %}
-                    <div class="block p-2 min-h-[80px] cursor-not-allowed">
-                        <span class="text-sm text-slate-300">{{ d.day }}</span>
+                    </div>
+                    <div class="mt-1 hidden md:block space-y-0.5 overflow-hidden" aria-hidden="true">
+                        {% for entry in entries|slice:":3" %}
+                        <span class="block text-xs truncate rounded px-1 py-0.5
+                            {% if entry.status == 'DONE' %}bg-green-100 text-green-800
+                            {% elif entry.status == 'IN_PROGRESS' %}bg-blue-100 text-blue-800
+                            {% else %}bg-amber-100 text-amber-800{% endif %}">
+                            {{ entry.title }}
+                        </span>
+                        {% endfor %}
+                        {% if entries|length > 3 %}
+                        <span class="block text-[10px] text-slate-500 px-1">+{{ entries|length|add:"-3" }} more</span>
+                        {% endif %}
                     </div>
                     {% endif %}
-                </td>
-                {% endfor %}
-            </tr>
+                </a>
+                {% else %}
+                <div class="flex flex-col h-full min-h-[3.25rem] sm:min-h-[4.75rem] p-1.5 sm:p-2 cursor-not-allowed" aria-hidden="true">
+                    <span class="text-xs sm:text-sm text-slate-300 tabular-nums">{{ d.day }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endwith %}
+            {% endwith %}
             {% endfor %}
-        </tbody>
-    </table>
-</div>
-</div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
 {% endblock %}

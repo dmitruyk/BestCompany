@@ -24,5 +24,18 @@ services:
       retries: 3
       start_period: 90s
 
+  # Background ticker: activity checks, autonomous loop, Monday weekly planning.
+  idea-factory-ticker:
+    image: ${REGISTRY_IMAGE:-192.168.0.230:5005/idea-factory:latest}
+    entrypoint: ["./docker-entrypoint-ticker.sh"]
+    command:
+      ["python", "manage.py", "run_company_ticker", "--loop"]
+    volumes:
+      - idea-factory-media:/app/media
+    restart: unless-stopped
+    depends_on:
+      idea-factory:
+        condition: service_healthy
+
 volumes:
   idea-factory-media:

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Direction - {{ company.name }}{% endblock %}
+
+{% block content %}
+<header class="mb-6">
+    <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">← {{ company.name }}</a>
+    <h1 class="text-2xl font-bold text-slate-900 mt-1">Strategic direction</h1>
+    <p class="text-sm text-slate-600 mt-1">Agree or clarify with founders before weekly planning.</p>
+</header>
+
+<form method="post" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-6 space-y-4">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save">
+    <div>
+        <label for="statement" class="block text-sm font-medium text-slate-700 mb-1">Where is the company heading?</label>
+        <textarea name="statement" id="statement" rows="5" class="form-control" required
+            placeholder="Goals, market focus, priorities for the next quarter…">{% if direction %}{{ direction.statement }}{% endif %}</textarea>
+    </div>
+    <button type="submit" class="btn-primary">Save direction</button>
+</form>
+
+{% if direction and not direction.founder_verified %}
+<form method="post" class="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="verify">
+    <p class="text-sm text-emerald-900 mb-3">Founders have reviewed and agree with this direction?</p>
+    <button type="submit" class="btn-primary bg-emerald-600 hover:bg-emerald-700">Mark as founder-verified</button>
+</form>
+{% elif direction and direction.founder_verified %}
+<p class="text-sm text-emerald-700">✓ Founder-verified on {{ direction.verified_at|date:"M j, Y H:i" }}</p>
+{% endif %}
+
+{% if directions %}
+<h2 class="text-lg font-semibold text-slate-900 mt-8 mb-3">History</h2>
+<ul class="text-sm space-y-2 text-slate-600">
+    {% for d in directions %}
+    <li class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+        {{ d.statement|truncatewords:25 }}
+        {% if d.is_active %}<span class="text-indigo-600 font-medium">active</span>{% endif %}
+        {% if d.founder_verified %}<span class="text-emerald-600">verified</span>{% endif %}
+        <span class="text-slate-400 block text-xs">{{ d.created_at|date:"M j, Y" }}</span>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

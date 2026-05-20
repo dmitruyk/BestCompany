@@ -23,6 +23,11 @@
 | `GOOGLE_CALENDAR_CLIENT_ID` | (empty) | Google OAuth client ID for calendar sync |
 | `GOOGLE_CALENDAR_CLIENT_SECRET` | (empty) | Google OAuth client secret |
 | `GOOGLE_CALENDAR_DEFAULT_REMINDERS` | `60,1440` | Default reminder offsets in minutes (comma-separated) |
+| `TICKER_ENABLED` | `true` | Set `false` to disable background ticker |
+| `TICKER_INTERVAL_SECONDS` | `3600` | Seconds between ticks in Docker `idea-factory-ticker` |
+| `TICKER_WEEKLY_PLANNING` | `true` | Run `run_weekly_planning` on Mondays from ticker |
+| `TICKER_WEEKLY_PLANNING_HOUR` | `8` | Local hour (0–23) when Monday planning is allowed |
+| `TICKER_STALE_PLANNING_HOURS` | `2` | Mark stuck `IN_PROGRESS` planning sessions as FAILED |
 
 Copy `.env.example` to `.env` and load with `python-dotenv` or your preferred method.
 
@@ -50,6 +55,18 @@ make build-push-docker
 
 ```bash
 docker compose pull && docker compose up -d
+```
+
+This starts **two** services from the same image:
+
+- `idea-factory` — gunicorn web UI (migrations, static, admin on start)
+- `idea-factory-ticker` — `run_company_ticker --loop` (activity checks, autonomous loop, Monday planning)
+
+One-shot ticker (host cron without Docker ticker):
+
+```bash
+make ticker-once
+# or: scripts/run_company_ticker.sh
 ```
 
 **Security:** the private registry image contains secrets from your build machine. Do not push to public registries. Rebuild after changing `.env`.

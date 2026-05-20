@@ -23,6 +23,14 @@ makemigrations:
 migrate:
 	python manage.py migrate --noinput
 
+.PHONY: weekly-planning
+weekly-planning:
+	python manage.py run_weekly_planning
+
+.PHONY: ticker-once
+ticker-once:
+	python manage.py run_company_ticker --once
+
 .PHONY: ensure-admin
 ensure-admin:
 	python manage.py ensure_default_admin

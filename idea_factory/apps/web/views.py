@@ -27,12 +27,14 @@ from apps.ideas.best_practices import assess_company_readiness
 from apps.ideas.context import build_idea_request_prompt
 from apps.ideas.autonomous_loop import count_unscheduled_selected, process_company
 from apps.ideas.development_plan import get_development_plan_summary
+from apps.ideas.planning_context import compute_progress_metrics, get_active_direction
 from apps.ideas.models import (
     ActionProposal,
     AgentRun,
     Company,
     CompanyAgent,
     CompanyCalendarAction,
+    CompanyTask,
     CompanyTeamMember,
     IdeaConclusion,
     IdeaRequest,
@@ -446,6 +448,11 @@ def company_detail(request: HttpRequest, pk: str) -> HttpResponse:
     readiness = assess_company_readiness(company)
     dev_plan = get_development_plan_summary(company.idea_request)
     unscheduled_selected_count = count_unscheduled_selected(company)
+    progress = compute_progress_metrics(company)
+    direction = get_active_direction(company)
+    open_task_count = company.tasks.exclude(
+        status__in=[CompanyTask.Status.DONE, CompanyTask.Status.CANCELLED]
+    ).count()
     return render(
         request,
         "web/company_detail.html",
@@ -458,6 +465,9 @@ def company_detail(request: HttpRequest, pk: str) -> HttpResponse:
             "dev_plan": dev_plan,
             "human_roles": CompanyTeamMember.Role.choices,
             "unscheduled_selected_count": unscheduled_selected_count,
+            "progress": progress,
+            "direction": direction,
+            "open_task_count": open_task_count,
         },
     )
 
@@ -557,33 +567,110 @@ def company_agent_chat(request: HttpRequest, company_pk: str, agent_pk: str) -> 
     """Chat with a company agent."""
     company = get_company_for_user(request.user, company_pk)
     agent = get_object_or_404(CompanyAgent, pk=agent_pk, company=company)
-    messages = agent.user_messages.all().order_by("created_at")[:50]
+    messages = agent.user_messages.filter(user=request.user).order_by("created_at")[:50]
+    chat_pending = _agent_has_pending_message(agent, request.user)
     return render(
         request,
         "web/agent_chat.html",
-        {"company": company, "agent": agent, "messages": messages},
+        {
+            "company": company,
+            "agent": agent,
+            "messages": messages,
+            "chat_pending": chat_pending,
+        },
+    )
+
+
+def _agent_has_pending_message(agent: CompanyAgent, user) -> bool:
+    from apps.ideas.models import UserAgentMessage
+
+    return UserAgentMessage.objects.filter(
+        agent=agent, user=user, agent_response=""
+    ).exists()
+
+
+def _spawn_agent_chat_process(message_pk: str) -> None:
+    """Spawn agent chat response generation in a separate Python process."""
+    root = _get_project_root()
+    subprocess.Popen(
+        [sys.executable, os.path.join(root, "manage.py"), "run_agent_chat", message_pk],
+        cwd=root,
+        env=_get_subprocess_env(),
+        start_new_session=True,
+    )
+
+
+def _run_agent_chat_message(message) -> None:
+    """Generate and save agent response for a pending user message."""
+    from apps.ideas.models import UserAgentMessage
+
+    message.refresh_from_db()
+    if message.agent_response:
+        return
+    company = message.agent.company
+    response_text = _get_agent_response(
+        message.agent, message.user_content, message.user, company
+    )
+    UserAgentMessage.objects.filter(pk=message.pk, agent_response="").update(
+        agent_response=response_text
     )
 
 
 @login_required
 @require_POST
 def agent_chat_send(request: HttpRequest, company_pk: str, agent_pk: str) -> HttpResponse:
-    """Send message to agent and get response."""
+    """Queue user message and generate agent response asynchronously."""
+    from apps.ideas.models import UserAgentMessage
+
     company = get_company_for_user(request.user, company_pk)
     agent = get_object_or_404(CompanyAgent, pk=agent_pk, company=company)
     user_content = request.POST.get("content", "").strip()
     if not user_content:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Message cannot be empty."}, status=400)
         return redirect("company_agent_chat", company_pk=company_pk, agent_pk=agent_pk)
-    response_text = _get_agent_response(agent, user_content, request.user, company)
-    from apps.ideas.models import UserAgentMessage
-
-    UserAgentMessage.objects.create(
+    if _agent_has_pending_message(agent, request.user):
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {"ok": False, "error": "Please wait for the agent to finish responding."},
+                status=409,
+            )
+        messages.error(request, "Please wait for the agent to finish responding.")
+        return redirect("company_agent_chat", company_pk=company_pk, agent_pk=agent_pk)
+    msg = UserAgentMessage.objects.create(
         user=request.user,
         agent=agent,
         user_content=user_content,
-        agent_response=response_text,
+        agent_response="",
     )
+    _spawn_agent_chat_process(str(msg.pk))
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse(
+            {"ok": True, "message_id": str(msg.pk), "user_content": user_content}
+        )
     return redirect("company_agent_chat", company_pk=company_pk, agent_pk=agent_pk)
+
+
+@login_required
+@require_http_methods(["GET"])
+def agent_chat_message_status(
+    request: HttpRequest, company_pk: str, agent_pk: str, message_pk: str
+) -> JsonResponse:
+    """Poll for agent response on a single chat message."""
+    from apps.ideas.models import UserAgentMessage
+
+    company = get_company_for_user(request.user, company_pk)
+    agent = get_object_or_404(CompanyAgent, pk=agent_pk, company=company)
+    msg = get_object_or_404(
+        UserAgentMessage, pk=message_pk, agent=agent, user=request.user
+    )
+    return JsonResponse(
+        {
+            "id": str(msg.pk),
+            "pending": not msg.agent_response,
+            "agent_response": msg.agent_response,
+        }
+    )
 
 
 def _get_calendar_context(company: Company) -> str:
@@ -819,8 +906,11 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
 
     company = get_company_for_user(request.user, company_pk)
     start_date = _company_start_date(company)
-    default_year = start_date.year
-    default_month = start_date.month
+    today = timezone.localdate()
+    if today >= start_date:
+        default_year, default_month = today.year, today.month
+    else:
+        default_year, default_month = start_date.year, start_date.month
     year = int(request.GET.get("year", default_year))
     month = int(request.GET.get("month", default_month))
     shown_first = date(year, month, 1)
@@ -845,6 +935,8 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
     has_prev = (prev_year, prev_month) >= (start_date.year, start_date.month)
     next_month = month + 1 if month < 12 else 1
     next_year = year if month < 12 else year + 1
+    is_current_month = year == today.year and month == today.month
+    can_go_today = today >= start_date
     return render(
         request,
         "web/company_calendar.html",
@@ -852,9 +944,13 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
             "company": company,
             "year": year,
             "month": month,
+            "month_name": cal_module.month_name[month],
             "weeks": weeks,
             "actions_by_date": actions_by_date,
             "start_date": start_date,
+            "today": today,
+            "is_current_month": is_current_month,
+            "can_go_today": can_go_today,
             "prev_year": prev_year,
             "prev_month": prev_month,
             "next_year": next_year,
@@ -887,6 +983,7 @@ def company_calendar_date(
         company=company, action_date=action_date
     ).order_by("status", "title")
     status_choices = CompanyCalendarAction.ActionStatus.choices
+    today = timezone.localdate()
     return render(
         request,
         "web/company_calendar_date.html",
@@ -895,6 +992,8 @@ def company_calendar_date(
             "action_date": action_date,
             "actions": actions,
             "status_choices": status_choices,
+            "today": today,
+            "is_today": action_date == today,
         },
     )
 

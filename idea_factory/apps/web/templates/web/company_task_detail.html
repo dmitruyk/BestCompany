@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}{{ task.title }} - {{ company.name }}{% endblock %}
+
+{% block content %}
+<header class="mb-6">
+    <a href="{% url 'company_tasks' company_pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">← Tasks</a>
+    <h1 class="text-2xl font-bold text-slate-900 mt-1">{{ task.title }}</h1>
+    <p class="text-sm text-slate-600 mt-1">{{ task.description }}</p>
+</header>
+
+<div class="grid gap-6 lg:grid-cols-2">
+    <section class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">Update task</h2>
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label for="status" class="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                <select name="status" id="status" class="form-control">
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if task.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="progress_percent" class="block text-sm font-medium text-slate-700 mb-1">Progress %</label>
+                <input type="number" name="progress_percent" id="progress_percent" min="0" max="100" value="{{ task.progress_percent }}" class="form-control">
+            </div>
+            <div>
+                <label for="assigned_agent_id" class="block text-sm font-medium text-slate-700 mb-1">Assign to agent</label>
+                <select name="assigned_agent_id" id="assigned_agent_id" class="form-control">
+                    <option value="">—</option>
+                    {% for agent in agents %}
+                    <option value="{{ agent.pk }}" {% if task.assigned_agent_id == agent.pk %}selected{% endif %}>{{ agent.name }} ({{ agent.get_role_display }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="assigned_human_id" class="block text-sm font-medium text-slate-700 mb-1">Assign to human</label>
+                <select name="assigned_human_id" id="assigned_human_id" class="form-control">
+                    <option value="">—</option>
+                    {% for human in humans %}
+                    <option value="{{ human.pk }}" {% if task.assigned_human_id == human.pk %}selected{% endif %}>{{ human.name }} ({{ human.get_role_display }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="result_summary" class="block text-sm font-medium text-slate-700 mb-1">Result (when done)</label>
+                <textarea name="result_summary" id="result_summary" rows="3" class="form-control" placeholder="Outcome for next planning…">{{ task.result_summary }}</textarea>
+            </div>
+            <div>
+                <label for="result_notes" class="block text-sm font-medium text-slate-700 mb-1">Result notes / links</label>
+                <textarea name="result_notes" id="result_notes" rows="2" class="form-control">{{ task.result_notes }}</textarea>
+            </div>
+            <button type="submit" class="btn-primary w-full sm:w-auto">Save</button>
+        </form>
+        {% if task.assignee_type == 'agent' and task.status != 'DONE' %}
+        <form method="post" action="{% url 'company_task_escalate' company_pk=company.pk task_pk=task.pk %}" class="mt-4 pt-4 border-t border-slate-200">
+            {% csrf_token %}
+            <p class="text-sm text-slate-600 mb-2">Agent cannot complete this task?</p>
+            <button type="submit" class="btn-secondary text-amber-800 border-amber-300">Escalate to human</button>
+        </form>
+        {% endif %}
+    </section>
+
+    <section class="space-y-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-900 mb-3">Dependencies</h2>
+            {% if dependencies %}
+            <ul class="text-sm space-y-2">
+                {% for dep in dependencies %}
+                <li>
+                    <a href="{% url 'company_task_detail' company_pk=company.pk task_pk=dep.depends_on.pk %}" class="text-indigo-600 hover:underline">{{ dep.depends_on.title }}</a>
+                    <span class="text-slate-500">({{ dep.depends_on.get_status_display }})</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-sm text-slate-500">No prerequisites.</p>
+            {% endif %}
+            {% if dependents %}
+            <p class="text-xs font-medium text-slate-500 uppercase mt-4 mb-2">Blocks</p>
+            <ul class="text-sm space-y-1">
+                {% for d in dependents %}
+                <li><a href="{% url 'company_task_detail' company_pk=company.pk task_pk=d.task.pk %}" class="text-indigo-600 hover:underline">{{ d.task.title }}</a></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% if task.planning_session %}
+        <p class="text-sm text-slate-500">From planning <a href="{% url 'company_planning_detail' company_pk=company.pk session_pk=task.planning_session.pk %}" class="text-indigo-600 hover:underline">{{ task.planning_session.week_start|date:"M j, Y" }}</a></p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

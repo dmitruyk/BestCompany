@@ -118,6 +118,14 @@ def date_gte(d, other):
     return d >= other
 
 
+@register.filter
+def date_eq(d, other):
+    """Return True if d == other (for date comparison)."""
+    if d is None or other is None:
+        return False
+    return d == other
+
+
 @register.inclusion_tag("web/includes/guide_hint.html")
 def guide_hint(
     title="",
