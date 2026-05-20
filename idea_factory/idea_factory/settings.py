@@ -146,6 +146,14 @@ LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/login/"
 
+# Google Calendar (optional) — sync company calendar actions to the owner's Google Calendar
+GOOGLE_CALENDAR_CLIENT_ID = os.environ.get("GOOGLE_CALENDAR_CLIENT_ID", "").strip()
+GOOGLE_CALENDAR_CLIENT_SECRET = os.environ.get("GOOGLE_CALENDAR_CLIENT_SECRET", "").strip()
+# Comma-separated reminder offsets in minutes (default: 1 hour and 1 day before the action date)
+GOOGLE_CALENDAR_DEFAULT_REMINDERS = os.environ.get(
+    "GOOGLE_CALENDAR_DEFAULT_REMINDERS", "60,1440"
+)
+
 # Logging - write to file (IDEA_FACTORY_LOG_FILE env overrides path)
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)

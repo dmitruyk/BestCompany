@@ -3,7 +3,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
-from apps.core.models import ServiceLLMConfig
+from apps.core.models import ServiceLLMConfig, UserProfile
 
 User = get_user_model()
 
@@ -286,5 +286,33 @@ class ServiceLLMConfigForm(forms.ModelForm):
             ),
             "openai_model_id": forms.TextInput(
                 attrs={"class": _INPUT_CLASS, "placeholder": "gpt-4o-mini"}
+            ),
+        }
+
+
+class GoogleCalendarSettingsForm(forms.ModelForm):
+    """Per-user Google Calendar sync preferences."""
+
+    class Meta:
+        model = UserProfile
+        fields = (
+            "google_calendar_sync_enabled",
+            "google_calendar_id",
+            "google_calendar_reminder_minutes",
+        )
+        widgets = {
+            "google_calendar_sync_enabled": forms.CheckboxInput(
+                attrs={"class": _CHECKBOX_CLASS}
+            ),
+            "google_calendar_id": forms.TextInput(
+                attrs={"class": _INPUT_CLASS, "placeholder": "primary"}
+            ),
+            "google_calendar_reminder_minutes": forms.TextInput(
+                attrs={"class": _INPUT_CLASS, "placeholder": "60,1440"}
+            ),
+        }
+        help_texts = {
+            "google_calendar_reminder_minutes": (
+                "Minutes before the action date. Example: 60,1440 = 1 hour and 1 day before."
             ),
         }

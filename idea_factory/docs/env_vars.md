@@ -20,6 +20,9 @@
 | `DB_PASSWORD` | (required) | PostgreSQL password |
 | `IDEA_FACTORY_LOG_FILE` | `idea_factory/logs/idea_factory.log` | Path to log file |
 | `IDEA_FACTORY_LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR) |
+| `GOOGLE_CALENDAR_CLIENT_ID` | (empty) | Google OAuth client ID for calendar sync |
+| `GOOGLE_CALENDAR_CLIENT_SECRET` | (empty) | Google OAuth client secret |
+| `GOOGLE_CALENDAR_DEFAULT_REMINDERS` | `60,1440` | Default reminder offsets in minutes (comma-separated) |
 
 Copy `.env.example` to `.env` and load with `python-dotenv` or your preferred method.
 

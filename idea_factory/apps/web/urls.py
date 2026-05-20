@@ -1,7 +1,7 @@
 """URL configuration for web app."""
 from django.urls import path
 
-from . import auth_views, llm_settings_views, user_views, views
+from . import auth_views, google_calendar_views, llm_settings_views, user_views, views
 
 urlpatterns = [
     path("login/", auth_views.app_login, name="app_login"),
@@ -13,6 +13,26 @@ urlpatterns = [
     ),
     path("settings/llm/", llm_settings_views.llm_settings, name="llm_settings"),
     path("settings/llm/test/", llm_settings_views.llm_settings_test, name="llm_settings_test"),
+    path(
+        "settings/google-calendar/",
+        google_calendar_views.google_calendar_settings,
+        name="google_calendar_settings",
+    ),
+    path(
+        "settings/google-calendar/connect/",
+        google_calendar_views.google_calendar_connect,
+        name="google_calendar_connect",
+    ),
+    path(
+        "settings/google-calendar/callback/",
+        google_calendar_views.google_calendar_callback,
+        name="google_calendar_callback",
+    ),
+    path(
+        "settings/google-calendar/disconnect/",
+        google_calendar_views.google_calendar_disconnect,
+        name="google_calendar_disconnect",
+    ),
     path("settings/users/", user_views.user_list, name="user_list"),
     path("settings/users/new/", user_views.user_create, name="user_create"),
     path("settings/users/<int:user_id>/edit/", user_views.user_edit, name="user_edit"),

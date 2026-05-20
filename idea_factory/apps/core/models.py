@@ -24,6 +24,26 @@ class UserProfile(models.Model):
         default=True,
         help_text="User may accept ideas and create companies (agent fleets).",
     )
+    google_calendar_sync_enabled = models.BooleanField(
+        default=False,
+        help_text="When True and connected, scheduled company calendar actions sync to Google Calendar.",
+    )
+    google_calendar_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="primary",
+        help_text="Google Calendar ID (usually 'primary' for the user's main calendar).",
+    )
+    google_calendar_reminder_minutes = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text="Comma-separated reminder offsets in minutes, e.g. 60,1440 for 1 hour and 1 day before.",
+    )
+    google_calendar_access_token = models.TextField(blank=True, default="")
+    google_calendar_refresh_token = models.TextField(blank=True, default="")
+    google_calendar_token_expiry = models.DateTimeField(null=True, blank=True)
+    google_calendar_connected_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

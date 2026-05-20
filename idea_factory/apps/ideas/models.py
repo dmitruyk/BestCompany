@@ -390,6 +390,13 @@ class CompanyCalendarAction(models.Model):
         max_length=20, choices=ActionStatus.choices, default=ActionStatus.PLANNED
     )
     completion_notes = models.TextField(blank=True)
+    google_event_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Google Calendar event ID when synced for the company owner.",
+    )
+    google_calendar_synced_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -69,6 +69,7 @@
                     <a href="{% url 'new_idea' %}" class="link-nav text-indigo-600 hover:text-indigo-800">New Request</a>
                     {% endif %}
                     {% if user.is_authenticated %}
+                        <a href="{% url 'google_calendar_settings' %}" class="link-nav">Google Calendar</a>
                         <span class="text-sm text-slate-600 hidden sm:inline" aria-label="Signed in as">{{ user.username }}</span>
                         {% if is_app_admin %}
                         <a href="{% url 'user_list' %}" class="link-nav">Users</a>

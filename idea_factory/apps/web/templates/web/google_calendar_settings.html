@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load web_extras %}
+
+{% block title %}Google Calendar - Idea Factory{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    <h1 class="text-2xl font-bold text-slate-900 mb-2">Google Calendar</h1>
+    <p class="text-sm text-slate-500 mb-6">
+        When connected, scheduled company calendar actions are added to your Google Calendar as
+        all-day events with popup reminders (for example, 1 hour and 1 day before the action date).
+    </p>
+
+    {% guide_hint title="What gets synced" body="Any action you schedule on a company calendar — from director discussions, manual + Add Action, or autonomous scheduling — appears on your Google Calendar if sync is enabled. Updates to title, date, status, or notes refresh the event." %}
+
+    {% if not configured %}
+    <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="alert">
+        <p class="font-semibold">Server not configured</p>
+        <p class="mt-1">An administrator must add Google OAuth credentials to the server <code class="text-xs bg-amber-100 px-1 rounded">.env</code> file. See the setup guide below.</p>
+    </div>
+    {% elif connected %}
+    <div class="mb-6 p-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm" role="status">
+        <p class="font-semibold">Connected</p>
+        {% if connected_at %}
+        <p class="mt-1">Linked on {{ connected_at|date:"M j, Y" }} at {{ connected_at|time:"g:i A" }}.</p>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="mb-6 p-4 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-sm" role="status">
+        <p class="font-semibold">Not connected</p>
+        <p class="mt-1">Connect your Google account to start syncing calendar actions.</p>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-3 mb-8">
+        {% if configured and not connected %}
+        <a href="{% url 'google_calendar_connect' %}" class="btn-primary">
+            Connect Google Calendar
+        </a>
+        {% endif %}
+        {% if connected %}
+        <form method="post" action="{% url 'google_calendar_disconnect' %}" class="inline"
+            onsubmit="return confirm('Disconnect Google Calendar? Existing synced events stay in Google but will no longer update.');">
+            {% csrf_token %}
+            <button type="submit" class="btn-secondary text-red-700 border-red-200 hover:bg-red-50">
+                Disconnect
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if connected %}
+    <form method="post" action="{% url 'google_calendar_settings' %}"
+        class="space-y-5 bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+        {% csrf_token %}
+        <div>
+            <label class="flex items-start gap-3 cursor-pointer">
+                {{ form.google_calendar_sync_enabled }}
+                <span>
+                    <span class="block text-sm font-medium text-slate-800">Enable sync</span>
+                    <span class="block text-xs text-slate-500 mt-0.5">Turn off to pause syncing without disconnecting Google.</span>
+                </span>
+            </label>
+        </div>
+        <div>
+            <label for="id_google_calendar_id" class="block text-sm font-medium text-slate-700 mb-1">Calendar ID</label>
+            {{ form.google_calendar_id }}
+            <p class="text-xs text-slate-500 mt-1">Usually <code class="bg-slate-100 px-1 rounded">primary</code> for your main calendar.</p>
+        </div>
+        <div>
+            <label for="id_google_calendar_reminder_minutes" class="block text-sm font-medium text-slate-700 mb-1">Reminders (minutes before)</label>
+            {{ form.google_calendar_reminder_minutes }}
+            <p class="text-xs text-slate-500 mt-1">{{ form.google_calendar_reminder_minutes.help_text }}</p>
+        </div>
+        <button type="submit" class="btn-primary">Save preferences</button>
+    </form>
+    {% endif %}
+
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-sm text-slate-700" aria-labelledby="setup-guide-heading">
+        <h2 id="setup-guide-heading" class="text-lg font-semibold text-slate-900 mb-4">Setup guide</h2>
+
+        <h3 class="font-semibold text-slate-800 mt-4 mb-2">For you (company owner)</h3>
+        <ol class="list-decimal list-inside space-y-2">
+            <li>Sign in to Idea Factory with the account that owns your companies.</li>
+            <li>Open <strong>Google Calendar</strong> in the top navigation (this page).</li>
+            <li>Click <strong>Connect Google Calendar</strong> and approve access for calendar events.</li>
+            <li>Enable sync and set reminders (for example <code class="bg-slate-100 px-1 rounded">60,1440</code>).</li>
+            <li>Schedule actions on any company calendar — they appear in Google Calendar with reminders.</li>
+        </ol>
+
+        <h3 class="font-semibold text-slate-800 mt-6 mb-2">For administrators (one-time server setup)</h3>
+        <ol class="list-decimal list-inside space-y-2">
+            <li>Open <a href="https://console.cloud.google.com/" class="text-indigo-600 hover:text-indigo-800" target="_blank" rel="noopener noreferrer">Google Cloud Console</a>.</li>
+            <li>Create or select a project → <strong>APIs &amp; Services</strong> → enable <strong>Google Calendar API</strong>.</li>
+            <li><strong>Credentials</strong> → <strong>Create credentials</strong> → <strong>OAuth client ID</strong> → type <strong>Web application</strong>.</li>
+            <li>Add an authorized redirect URI (must match your deploy URL exactly):
+                <pre class="mt-2 p-3 bg-slate-100 rounded-lg text-xs overflow-x-auto">https://YOUR_HOST/settings/google-calendar/callback/</pre>
+                For local development, also add:
+                <pre class="mt-2 p-3 bg-slate-100 rounded-lg text-xs overflow-x-auto">http://127.0.0.1:8000/settings/google-calendar/callback/</pre>
+            </li>
+            <li>Copy the Client ID and Client secret into <code class="bg-slate-100 px-1 rounded">idea_factory/.env</code>:
+                <pre class="mt-2 p-3 bg-slate-100 rounded-lg text-xs overflow-x-auto">GOOGLE_CALENDAR_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CALENDAR_CLIENT_SECRET=your-client-secret
+GOOGLE_CALENDAR_DEFAULT_REMINDERS=60,1440</pre>
+            </li>
+            <li>Ensure <code class="bg-slate-100 px-1 rounded">CSRF_TRUSTED_ORIGINS</code> and <code class="bg-slate-100 px-1 rounded">ALLOWED_HOSTS</code> include your public hostname, then restart the app.</li>
+            <li>If the app is in Google’s testing mode, add each user’s Gmail under OAuth consent screen → <strong>Test users</strong>.</li>
+        </ol>
+
+        <p class="mt-4 text-xs text-slate-500">
+            Full documentation: <code class="bg-slate-100 px-1 rounded">idea_factory/docs/google_calendar_integration.md</code>
+        </p>
+    </section>
+</div>
+{% endblock %}
