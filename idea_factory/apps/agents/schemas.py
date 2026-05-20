@@ -137,7 +137,10 @@ class FleetAgentDefinition(BaseModel):
     """Single agent definition for company fleet generation."""
 
     role: str = Field(
-        description="One of: cpa, director, marketer, developer, product, operations, custom"
+        description=(
+            "One of: founder, founder_assistant, cpa, director, planner, qa, "
+            "marketer, developer, product, operations"
+        )
     )
     name: str = Field(description="Display name for the agent")
     system_prompt: str = Field(description="System prompt defining agent behavior")
@@ -179,3 +182,54 @@ class DirectorDiscussionOutput(BaseModel):
         default_factory=list,
         description="1-2 concrete actions the director proposes",
     )
+
+
+class ActionSelectionOutput(BaseModel):
+    """Output from selector agent - which proposed actions to accept."""
+
+    selected_action_ids: list[int] = Field(
+        default_factory=list,
+        description="1-based indices of actions to select (best first); max 2",
+        max_length=2,
+    )
+    rationale: str = Field(default="", description="Why these actions were selected")
+
+
+class ScheduleProposalOutput(BaseModel):
+    """Output from scheduler agent - when to place action on calendar."""
+
+    action_date: str = Field(
+        description="Date in YYYY-MM-DD format for this action",
+    )
+    rationale: str = Field(default="", description="Why this date was chosen")
+
+
+class ExecutionOutput(BaseModel):
+    """Output from executor agent - completion of a calendar action."""
+
+    completion_notes: str = Field(
+        description="What was accomplished, outcomes, blockers if any",
+    )
+    outcome_assessment: str = Field(
+        default="",
+        description="Brief assessment: success, partial, needs_follow_up",
+    )
+    follow_up_suggested: bool = Field(
+        default=False,
+        description="Whether to spawn improvement discussion",
+    )
+
+
+class ResultCheckOutput(BaseModel):
+    """Output from checker agent - evaluation of completed action."""
+
+    quality_score: float = Field(default=0.5, ge=0, le=1, description="0-1 quality")
+    needs_improvement: bool = Field(
+        default=False,
+        description="Whether to spawn improvement discussion",
+    )
+    improvement_topic: str = Field(
+        default="",
+        description="Topic for follow-up discussion if needs_improvement",
+    )
+    summary: str = Field(default="", description="Brief evaluation summary")

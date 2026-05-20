@@ -8,11 +8,31 @@
         <div>
             <h1 class="text-2xl font-bold text-slate-900">{{ company.name }}</h1>
             <p class="mt-1 text-slate-500">Based on idea: {{ company.idea_request.title }}</p>
-            <span class="inline-flex mt-2 px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+            <span class="inline-flex mt-2 px-2 py-1 text-xs font-medium rounded-full
+                {% if company.status == 'REGENERATING_AGENTS' %}bg-blue-100 text-blue-800
+                {% elif company.status == 'ACTIVE' %}bg-green-100 text-green-800
+                {% else %}bg-slate-100 text-slate-800{% endif %}">
                 {{ company.get_status_display }}
             </span>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+            {% if company.status != 'REGENERATING_AGENTS' %}
+            <form method="post" action="{% url 'toggle_autonomous_mode' pk=company.pk %}" class="inline">
+                {% csrf_token %}
+                <button type="submit"
+                    class="inline-flex px-4 py-2 rounded-lg text-sm font-medium {% if company.autonomous_mode %}bg-emerald-100 text-emerald-800 border border-emerald-300{% else %}bg-slate-100 text-slate-700 border border-slate-300{% endif %} hover:opacity-90"
+                    aria-label="Toggle autonomous mode"
+                    title="{% if company.autonomous_mode %}Autonomous: agents select, schedule, execute. Click to switch to manual.{% else %}Manual: you select and approve. Click to switch to autonomous.{% endif %}">
+                    {% if company.autonomous_mode %}🤖 Self-Run{% else %}👤 Manual{% endif %}
+                </button>
+            </form>
+            <form method="post" action="{% url 'regenerate_agents' pk=company.pk %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg border border-amber-300 text-amber-800 text-sm font-medium hover:bg-amber-50" aria-label="Regenerate agents">
+                    Regenerate Agents
+                </button>
+            </form>
+            {% endif %}
             <a href="{% url 'company_calendar' company_pk=company.pk %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
                 Calendar
             </a>
@@ -21,6 +41,49 @@
             </a>
         </div>
     </div>
+</div>
+
+{% if company.status == 'REGENERATING_AGENTS' %}
+<p class="mb-4 text-sm text-blue-600">Regenerating agent fleet based on current company state… Page refreshes when done.</p>
+{% endif %}
+
+<div class="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <div class="flex flex-wrap justify-between items-start gap-4 mb-4">
+        <div>
+            <h2 class="text-lg font-semibold text-slate-900">Company readiness</h2>
+            <p class="text-sm text-slate-500 mt-1">Phase: <span class="font-medium text-slate-700">{{ readiness.phase }}</span> · Score: {{ readiness.score_percent }}% ({{ readiness.pass_count }} pass, {{ readiness.warn_count }} warn, {{ readiness.fail_count }} fail)</p>
+        </div>
+    </div>
+    <ul class="grid gap-2 sm:grid-cols-2">
+        {% for check in readiness.checks %}
+        <li class="flex gap-2 text-sm p-2 rounded-lg bg-slate-50 border border-slate-100">
+            <span aria-hidden="true">{{ check.icon }}</span>
+            <div>
+                <span class="font-medium text-slate-800">{{ check.label }}</span>
+                <p class="text-slate-600">{{ check.message }}</p>
+                {% if check.owner_hint %}<p class="text-xs text-slate-400 mt-0.5">Owner: {{ check.owner_hint }}</p>{% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% if dev_plan.has_plan %}
+    <div class="mt-4 pt-4 border-t border-slate-200">
+        <h3 class="text-sm font-semibold text-slate-800 mb-2">Development plan (from idea pipeline)</h3>
+        {% if dev_plan.go_no_go %}<p class="text-sm text-slate-600 mb-2"><span class="font-medium">Go/no-go:</span> {{ dev_plan.go_no_go }}</p>{% endif %}
+        {% if dev_plan.milestones %}
+        <p class="text-xs font-medium text-slate-500 uppercase mb-1">Milestones</p>
+        <ul class="text-sm text-slate-600 list-disc list-inside mb-2">
+            {% for m in dev_plan.milestones|slice:":5" %}<li>{{ m }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% if dev_plan.kpis %}
+        <p class="text-xs font-medium text-slate-500 uppercase mb-1">KPIs</p>
+        <ul class="text-sm text-slate-600 list-disc list-inside">
+            {% for k in dev_plan.kpis|slice:":5" %}<li>{{ k }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 <div class="grid gap-6 lg:grid-cols-2">
@@ -48,7 +111,7 @@
 
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Director Discussions</h2>
-        <p class="text-sm text-slate-500 mb-4">Directors discuss topics and propose actions. You select which actions to implement.</p>
+        <p class="text-sm text-slate-500 mb-4">Directors discuss topics and propose actions. {% if company.autonomous_mode %}In Self-Run mode, agents select and execute.{% else %}You select which actions to implement.{% endif %}</p>
         <a href="{% url 'start_discussion' company_pk=company.pk %}"
             class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 mb-4">
             Start New Discussion
@@ -76,7 +139,59 @@
 </div>
 
 <div class="mt-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-2">Human team</h2>
+    <p class="text-sm text-slate-500 mb-4">Founders, assistants, QA, marketing, and other humans alongside AI agents.</p>
+    <ul class="space-y-2 mb-4">
+        {% for member in team_members %}
+        <li class="text-sm text-slate-700 p-2 rounded-lg bg-slate-50 border border-slate-100">
+            <span class="font-medium">{{ member.name }}</span>
+            <span class="text-slate-500"> — {{ member.get_role_display }}{% if member.email %} · {{ member.email }}{% endif %}</span>
+        </li>
+        {% empty %}
+        <li class="text-sm text-slate-500">No human team members yet.</li>
+        {% endfor %}
+    </ul>
+    <form method="post" action="{% url 'add_team_member' pk=company.pk %}" class="flex flex-wrap gap-3 items-end">
+        {% csrf_token %}
+        <div>
+            <label for="member_name" class="block text-xs font-medium text-slate-600 mb-1">Name</label>
+            <input type="text" name="name" id="member_name" required maxlength="120" class="rounded-lg border-slate-300 text-sm">
+        </div>
+        <div>
+            <label for="member_role" class="block text-xs font-medium text-slate-600 mb-1">Role</label>
+            <select name="role" id="member_role" class="rounded-lg border-slate-300 text-sm">
+                {% for value, label in human_roles %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="member_email" class="block text-xs font-medium text-slate-600 mb-1">Email (optional)</label>
+            <input type="email" name="email" id="member_email" class="rounded-lg border-slate-300 text-sm">
+        </div>
+        <button type="submit" class="inline-flex px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Add member</button>
+    </form>
+</div>
+
+<div class="mt-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
     <h2 class="text-lg font-semibold text-slate-900 mb-2">Original Idea</h2>
     <p class="text-slate-600 whitespace-pre-wrap">{{ company.idea_request.prompt }}</p>
 </div>
+
+{% if company.status == 'REGENERATING_AGENTS' %}
+<script>
+(function pollCompany() {
+    fetch('{% url "company_status" pk=company.pk %}')
+        .then(r => r.json())
+        .then(function(data) {
+            if (data.status !== 'REGENERATING_AGENTS') {
+                window.location.reload();
+                return;
+            }
+            setTimeout(pollCompany, 2000);
+        })
+        .catch(function() { setTimeout(pollCompany, 5000); });
+})();
+</script>
+{% endif %}
 {% endblock %}

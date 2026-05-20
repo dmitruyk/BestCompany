@@ -17,7 +17,7 @@ def test_run_pipeline_with_mock_fails_gracefully() -> None:
         status=IdeaRequest.Status.PENDING,
         provider="openai",
     )
-    with patch("apps.agents.orchestration.get_model") as mock_get:
+    with patch("apps.agents.orchestration.get_model_for_idea") as mock_get:
         mock_get.side_effect = ValueError("OPENAI_API_KEY required")
         run_pipeline(idea)
     idea.refresh_from_db()

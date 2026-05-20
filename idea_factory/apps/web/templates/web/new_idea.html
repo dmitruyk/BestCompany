@@ -19,7 +19,7 @@
     </div>
     {% endif %}
 
-    <form method="post" action="{% url 'new_idea' %}" class="space-y-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <form method="post" action="{% url 'new_idea' %}" enctype="multipart/form-data" class="space-y-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         {% csrf_token %}
         <div>
             <label for="title" class="block text-sm font-medium text-slate-700 mb-1">Title</label>
@@ -33,22 +33,61 @@
                 class="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ request.POST.prompt|default:'' }}</textarea>
         </div>
         <div>
+            <label for="pdf_documents" class="block text-sm font-medium text-slate-700 mb-1">PDF documents (optional)</label>
+            <p class="text-xs text-slate-500 mb-2">Attach up to 5 PDFs (10 MB each). Text is extracted and included as context for agents.</p>
+            <input type="file" name="pdf_documents" id="pdf_documents" accept="application/pdf,.pdf" multiple
+                class="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+        </div>
+        <div>
             <label for="provider" class="block text-sm font-medium text-slate-700 mb-1">LLM Provider</label>
             <select name="provider" id="provider" class="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 {% for value, label in providers %}
-                <option value="{{ value }}" {% if request.POST.provider == value %}selected{% endif %}>{{ label }}</option>
+                <option value="{{ value }}" {% if request.POST.provider == value or not request.POST.provider and default_provider == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="model_id" class="block text-sm font-medium text-slate-700 mb-1">Model (Ollama, tool-capable)</label>
+            <label for="model_id" class="block text-sm font-medium text-slate-700 mb-1">Model</label>
             <select name="model_id" id="model_id" class="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">Use default (gpt-oss:20b)</option>
-                {% for value, label in ollama_models %}
-                <option value="{{ value }}" {% if request.POST.model_id == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
+                <optgroup label="Ollama (tool-capable)">
+                    <option value="" data-provider="ollama">Use default (gpt-oss:20b)</option>
+                    {% for value, label in ollama_models %}
+                    <option value="{{ value }}" data-provider="ollama" {% if request.POST.model_id == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </optgroup>
+                <optgroup label="OpenAI">
+                    <option value="" data-provider="openai">Use default (gpt-4o-mini)</option>
+                    {% for value, label in openai_models %}
+                    <option value="{{ value }}" data-provider="openai" {% if request.POST.model_id == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </optgroup>
             </select>
         </div>
+        <script>
+            (function () {
+                const providerSelect = document.getElementById('provider');
+                const modelSelect = document.getElementById('model_id');
+                const syncModelOptions = () => {
+                    const provider = providerSelect.value;
+                    Array.from(modelSelect.options).forEach((opt) => {
+                        const optProvider = opt.dataset.provider;
+                        if (!optProvider) return;
+                        const show = optProvider === provider;
+                        opt.hidden = !show;
+                        opt.disabled = !show;
+                    });
+                    const selected = modelSelect.selectedOptions[0];
+                    if (selected && selected.disabled) {
+                        const first = Array.from(modelSelect.options).find(
+                            (o) => o.dataset.provider === provider && !o.disabled
+                        );
+                        if (first) modelSelect.value = first.value;
+                    }
+                };
+                providerSelect.addEventListener('change', syncModelOptions);
+                syncModelOptions();
+            })();
+        </script>
         <div class="flex gap-4">
             <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50" {% if provider_error %}disabled{% endif %}>
                 Run Now

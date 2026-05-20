@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Dmytro Komarchuk, PhD | Lead Software Engineer | Technical Architect</title>
+  <meta name="description" content="Technical Architect and Engineering Leader. PhD, President Prize Laureate, EB-1A. AI, distributed systems, cloud. San Francisco.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet">
+  <style>
+    /* Gregory Renard–inspired style: clean white, editorial, minimal */
+    :root {
+      --bg-main: #ffffff;
+      --bg-card: #fafafa;
+      --text-primary: #231f20;
+      --text-secondary: #595959;
+      --accent: #116dff;
+      --accent-hover: #0a5ae6;
+      --border: #e5e5e5;
+      --font-heading: 'Cormorant Garamond', Georgia, serif;
+      --font-body: Helvetica, Arial, sans-serif;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      box-sizing: border-box;
+    }
+    html {
+      -ms-scroll-behavior: smooth;
+      scroll-behavior: smooth;
+    }
+    body {
+      font-family: var(--font-body);
+      background: var(--bg-main);
+      color: var(--text-primary);
+      line-height: 1.7;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+    @media (max-width: 480px) {
+      .container { padding: 0 1rem; }
+    }
+    header {
+      padding: 2.5rem 0 3rem;
+      border-bottom: 1px solid var(--border);
+    }
+    nav {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -ms-flex-wrap: wrap;
+      flex-wrap: wrap;
+      margin-bottom: 3rem;
+      margin-left: -0.5rem;
+    }
+    nav a {
+      margin: 0 0.5rem;
+    }
+    @media (min-width: 769px) {
+      nav a { margin-left: 1.5rem; margin-right: 1.5rem; }
+    }
+    nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.95rem;
+      -webkit-transition: color 0.2s ease;
+      -moz-transition: color 0.2s ease;
+      -o-transition: color 0.2s ease;
+      transition: color 0.2s ease;
+      padding: 0.5rem 0;
+      display: inline-block;
+    }
+    @media (max-width: 768px) {
+      nav { margin-bottom: 2rem; }
+      nav a { font-size: 0.9rem; }
+    }
+    nav a:hover {
+      color: var(--accent);
+    }
+    .hero {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+      flex-direction: row;
+      -ms-flex-wrap: wrap;
+      flex-wrap: wrap;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      padding: 2rem 0 3rem;
+      margin: 0 -1rem;
+    }
+    .hero > div:first-child {
+      -webkit-box-flex: 1;
+      -ms-flex: 1 1 400px;
+      flex: 1 1 400px;
+      min-width: 0;
+      padding: 0 1rem;
+    }
+    .hero-photo {
+      -webkit-box-flex: 0;
+      -ms-flex: 0 0 280px;
+      flex: 0 0 280px;
+      padding: 0 1rem;
+    }
+    @media (max-width: 900px) {
+      .hero-photo { -ms-flex: 0 0 220px; flex: 0 0 220px; }
+    }
+    @media (max-width: 768px) {
+      .hero {
+        -webkit-box-orient: vertical;
+        -webkit-box-direction: reverse;
+        -ms-flex-direction: column-reverse;
+        flex-direction: column-reverse;
+        text-align: center;
+        padding: 1.5rem 0 2.5rem;
+      }
+      .hero > div:first-child { -ms-flex: 1 1 100%; flex: 1 1 100%; }
+      .hero-photo { width: 240px; margin-bottom: 1.5rem; margin-left: auto; margin-right: auto; }
+    }
+    @media (max-width: 480px) {
+      .hero-photo { width: 200px; }
+    }
+    .hero h1 {
+      font-family: var(--font-heading);
+      font-size: 3rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2rem; }
+    }
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 1.75rem; }
+    }
+    .hero-tagline {
+      font-size: 1.1rem;
+      color: var(--text-primary);
+      margin-bottom: 1.25rem;
+      max-width: 540px;
+      line-height: 1.65;
+    }
+    @media (max-width: 768px) {
+      .hero-tagline { margin-left: auto; margin-right: auto; font-size: 1rem; }
+    }
+    .hero-badges {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .hero-badges .sep {
+      margin: 0 0.4em;
+      color: var(--text-secondary);
+      font-weight: 300;
+    }
+    .hero-photo {
+      border-radius: 12px;
+      overflow: hidden;
+      width: 280px;
+      -webkit-flex-shrink: 0;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+    }
+    .hero-photo img {
+      width: 100%;
+      height: auto;
+      display: block;
+      vertical-align: top;
+    }
+    section {
+      padding: 3rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    @media (max-width: 768px) {
+      section { padding: 2rem 0; }
+    }
+    @media (max-width: 480px) {
+      section { padding: 1.5rem 0; }
+    }
+    section:last-of-type {
+      border-bottom: none;
+    }
+    h2 {
+      font-family: var(--font-heading);
+      font-size: 1.65rem;
+      font-weight: 500;
+      margin-bottom: 1.25rem;
+      color: var(--text-primary);
+    }
+    @media (max-width: 480px) {
+      h2 { font-size: 1.35rem; }
+    }
+    .section-intro {
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+    .award-card {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -ms-flex-wrap: wrap;
+      flex-wrap: wrap;
+      margin-bottom: 0;
+      padding: 0;
+      background: transparent;
+      -webkit-box-align: start;
+      -ms-flex-align: start;
+      align-items: flex-start;
+    }
+    .award-content {
+      -webkit-box-flex: 1;
+      -ms-flex: 1 1 200px;
+      flex: 1 1 200px;
+      min-width: 0;
+    }
+    .award-icon {
+      margin-right: 1.5rem;
+      margin-bottom: 0;
+    }
+    @media (max-width: 600px) {
+      .award-card {
+        padding: 1.5rem;
+        -webkit-box-orient: vertical;
+        -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+        flex-direction: column;
+      }
+      .award-icon { margin-right: 0; margin-bottom: 1rem; }
+    }
+    .award-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 4px;
+      -webkit-flex-shrink: 0;
+      -ms-flex-negative: 0;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .award-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .award-content h3 {
+      font-size: 1.15rem;
+      margin-bottom: 0.5rem;
+    }
+    .award-content p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+    .award-content a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.95rem;
+      margin-top: 0.5rem;
+      display: inline-block;
+      -webkit-transition: color 0.2s ease;
+      transition: color 0.2s ease;
+    }
+    .award-content a:hover {
+      text-decoration: underline;
+      color: var(--accent-hover);
+    }
+    .phd-list {
+      list-style: none;
+    }
+    .phd-list li {
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: start;
+      -ms-flex-align: start;
+      align-items: flex-start;
+      -ms-flex-wrap: wrap;
+      flex-wrap: wrap;
+    }
+    .phd-list li strong {
+      margin-right: 1rem;
+    }
+    @media (max-width: 600px) {
+      .phd-list li { -webkit-box-orient: vertical; -webkit-box-direction: normal; -ms-flex-direction: column; flex-direction: column; }
+    }
+    .phd-list li:last-child {
+      border-bottom: none;
+    }
+    .phd-list strong {
+      color: var(--text-primary);
+      flex-shrink: 0;
+    }
+    .phd-list span {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+    .work-grid {
+      display: block;
+    }
+    .work-card {
+      background: transparent;
+      border-radius: 0;
+      padding: 0 0 1.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .work-card:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    @media (max-width: 480px) {
+      .work-card { padding: 1.25rem 1.5rem; }
+    }
+    .work-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.25rem;
+    }
+    .work-card .meta {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.75rem;
+    }
+    .work-card p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+    .eb1-banner {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 2rem;
+    }
+    @media (max-width: 480px) {
+      .eb1-banner { padding: 1.5rem; }
+    }
+    .eb1-banner h2 {
+      margin-bottom: 1rem;
+    }
+    .eb1-banner .badge {
+      display: inline-block;
+      color: var(--accent);
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+    }
+    .skills-row {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+      margin-left: -0.25rem;
+      margin-right: -0.25rem;
+    }
+    .skills-row .skill-tag {
+      margin: 0.25rem;
+    }
+    .skill-tag {
+      background: transparent;
+      border: none;
+      padding: 0;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      display: inline;
+    }
+    .skills-row .skill-tag + .skill-tag::before {
+      content: ' · ';
+      margin: 0 0.2em;
+    }
+    .cta-section {
+      text-align: center;
+      padding: 3rem 0;
+    }
+    .cta-section h2 {
+      margin-bottom: 0.75rem;
+    }
+    .cta-section p {
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+    }
+    .btn {
+      display: -webkit-inline-box;
+      display: -ms-inline-flexbox;
+      display: inline-flex;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      background: transparent;
+      color: var(--accent);
+      padding: 0;
+      border-radius: 0;
+      text-decoration: none;
+      font-weight: 400;
+      -webkit-transition: color 0.2s ease;
+      transition: color 0.2s ease;
+    }
+    .btn:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+    .btn-outline {
+      background: transparent;
+      border: none;
+      color: var(--accent);
+      margin-left: 1.5rem;
+    }
+    @media (max-width: 480px) {
+      .cta-section .btn { display: block; margin: 0.5rem 0; }
+      .cta-section .btn-outline { margin-left: 0; }
+    }
+    .btn-outline:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+    footer {
+      padding: 2rem 0;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <header class="container">
+    <    <nav aria-label="Main navigation">
+      <a href="#about">Home</a>
+      <a href="#award">Award</a>
+      <a href="#phd">PhD & Research</a>
+      <a href="#experience">Experience</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="hero" id="about">
+      <div>
+        <h1>Dmytro Komarchuk</h1>
+        <p class="hero-tagline">
+          Turning complex technical challenges into scalable, production-grade systems. Technical Architect and Engineering Leader at the intersection of AI research, cloud infrastructure, and product delivery.
+        </p>
+        <p class="hero-badges">
+          PhD, Electrical Systems and Computer Science<span class="sep">·</span> Laureate, President Prize for Young Scientists 2018<span class="sep">·</span> EB-1A Extraordinary Ability<span class="sep">·</span> San Francisco, CA
+        </p>
+      </div>
+      <div class="hero-photo">
+        <img src="photo_2026-03-05_18-17-15.jpg" alt="Dmytro Komarchuk, Lead Software Engineer in San Francisco" width="280" height="auto">
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="container" id="award">
+      <h2>President Prize for Young Scientists</h2>
+      <p class="section-intro">
+        The President of Ukraine Prize for Young Scientists is awarded annually for outstanding achievements in natural, technical, and humanities sciences that advance societal progress and enhance Ukraine's scientific reputation internationally. Recipients receive the title of laureate and an official certificate.
+      </p>
+      <div class="award-card">
+        <div class="award-icon" aria-hidden="true">
+          <img src="Znak_pr_prez_mv.jpg" alt="President of Ukraine Prize for Young Scientists badge" width="64" height="64">
+        </div>
+        <div class="award-content">
+          <h3>Laureate, 2018</h3>
+          <p>
+            Awarded for contributions in electrical systems, automation, and applied research—including software for crop status estimation using UAV imagery, optimizing fertilizer use and increasing crop yields by up to 50%.
+          </p>
+          <a href="https://uk.wikipedia.org/wiki/%D0%9F%D1%80%D0%B5%D0%BC%D1%96%D1%8F_%D0%9F%D1%80%D0%B5%D0%B7%D0%B8%D0%B4%D0%B5%D0%BD%D1%82%D0%B0_%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D0%B8_%D0%B4%D0%BB%D1%8F_%D0%BC%D0%BE%D0%BB%D0%BE%D0%B4%D0%B8%D1%85_%D0%B2%D1%87%D0%B5%D0%BD%D0%B8%D1%85" target="_blank" rel="noopener noreferrer">Learn about the award →</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="container" id="phd">
+      <h2>PhD & Research</h2>
+      <p class="section-intro">
+        Doctor of Philosophy in Electrical Systems, with expertise spanning automation, mathematical modeling, and intelligent control systems.
+      </p>
+      <ul class="phd-list">
+        <li>
+          <strong>PhD, Electrical Systems</strong>
+          <span>National University of Life and Environmental Sciences of Ukraine, 2010–2013</span>
+        </li>
+        <li>
+          <strong>Dissertation</strong>
+          <span>Mathematical Modeling of Induction Heaters and Development of Automation Systems</span>
+        </li>
+        <li>
+          <strong>Focus</strong>
+          <span>Electrical Complexes and Robotic Systems</span>
+        </li>
+        <li>
+          <strong>Applied Research</strong>
+          <span>UAV imagery for crop status estimation, precision agriculture, digital twin systems for building operations, EV charging infrastructure</span>
+        </li>
+      </ul>
+      <h2 style="margin-top: 2.5rem;">Research & Contributions</h2>
+      <p class="section-intro">
+        Peer-reviewed work and applied contributions in electrical engineering, automation, and software systems:
+      </p>
+      <div class="work-grid">
+        <div class="work-card">
+          <h3>Mathematical Modeling of Induction Heaters</h3>
+          <p>PhD research on automation and control systems for induction heating applications.</p>
+        </div>
+        <div class="work-card">
+          <h3>UAV-Based Crop Status Estimation</h3>
+          <p>Software for crop monitoring using UAV imagery, optimizing fertilizer use and increasing yields by up to 50%.</p>
+        </div>
+        <div class="work-card">
+          <h3>Digital Twin Systems</h3>
+          <p>Architected digital twin systems for building operations and remote control, improving operational efficiency.</p>
+        </div>
+      </div>
+      <h2 style="margin-top: 2.5rem;">Publications & Patents</h2>
+      <p class="section-intro">
+        Scholarly work in electrical engineering and automation; contributions to AI/ML systems and production software documented through technical design and implementations.
+      </p>
+      <div class="work-grid">
+        <div class="work-card">
+          <h3>Dissertation & Thesis</h3>
+          <p>Mathematical Modeling of Induction Heaters and Development of Automation Systems. National University of Life and Environmental Sciences of Ukraine, 2013.</p>
+        </div>
+        <div class="work-card">
+          <h3>Technical Contributions</h3>
+          <p>Production systems and architectural designs in distributed systems, AI orchestration, IoT, and cloud infrastructure—documented in design docs, RFCs, and internal technical publications.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="container" id="experience">
+      <h2>US Experience & Impact</h2>
+      <p class="section-intro">
+        Proven track record building mission-critical systems at scale across AI, cloud, IoT, and fintech in the United States.
+      </p>
+      <div class="work-grid">
+        <div class="work-card">
+          <h3>Senior Engineer, Cloud | BrightAI</h3>
+          <p class="meta">Palo Alto, CA · Sept 2025 – Present</p>
+          <p>
+            Design and scale cloud-native backend systems for AI-driven enterprise applications. Lead architecture for multi-agent LLM systems, distributed microservices, RAG pipelines, and high-throughput APIs. Production-grade reliability, security, and scalability.
+          </p>
+          <div class="skills-row">
+            <span class="skill-tag">Python</span>
+            <span class="skill-tag">FastAPI</span>
+            <span class="skill-tag">LLM/RAG</span>
+            <span class="skill-tag">Kubernetes</span>
+            <span class="skill-tag">PostgreSQL</span>
+            <span class="skill-tag">AWS</span>
+          </div>
+        </div>
+        <div class="work-card">
+          <h3>Senior Staff Software Engineer | Level Home Inc</h3>
+          <p class="meta">Aug 2022 – Sept 2025</p>
+          <p>
+            Core backend services, APIs, and data processing. Cryptographic operations, IoT protocols (WiFi, Z-Wave, Bluetooth), platform scalability and reliability.
+          </p>
+          <div class="skills-row">
+            <span class="skill-tag">Python</span>
+            <span class="skill-tag">Go</span>
+            <span class="skill-tag">C</span>
+            <span class="skill-tag">IoT</span>
+          </div>
+        </div>
+        <div class="work-card">
+          <h3>Senior Software Engineer | DataArt</h3>
+          <p class="meta">June 2021 – Aug 2022</p>
+          <p>
+            Finance risk prediction system using AI/ML. Web application for estimating credit and liability parameters, AWS Lambda, Google Cloud Functions.
+          </p>
+          <div class="skills-row">
+            <span class="skill-tag">Python</span>
+            <span class="skill-tag">ML</span>
+            <span class="skill-tag">AWS</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container" id="eb1">
+      <div class="eb1-banner">
+        <span class="badge">EB-1A Extraordinary Ability</span>
+        <h2>Self-Sponsored Green Card · Ready to Contribute</h2>
+        <p class="section-intro" style="margin-bottom: 0;">
+          Admitted as a person of extraordinary ability in the sciences. No employer sponsorship required—I bring deep technical leadership, PhD credentials, national recognition, and production experience at scale. Ideal for FAANG and top tech companies seeking senior architects who can own complex systems from day one.
+        </p>
+        <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.95rem;">
+          <strong style="color: var(--text-primary);">Why hire me:</strong> Technical ownership, cross-functional influence, mentorship, architecture reviews, design standards, and a record of turning ambitious roadmaps into reliable, scalable systems. I operate at the intersection of AI research and production engineering.
+        </p>
+      </div>
+    </section>
+
+    <section class="container" id="contact">
+      <div class="cta-section">
+        <h2>Contact Dmytro Komarchuk</h2>
+        <p>Open to senior and staff engineering roles at top technology companies.</p>
+        <p style="margin-bottom: 1rem;">
+          <a href="mailto:dmitruyk@gmail.com" class="btn" aria-label="Email Dmytro Komarchuk">dmitruyk@gmail.com</a>
+          <a href="https://www.linkedin.com/in/ikodi/" class="btn btn-outline" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn profile">LinkedIn</a>
+        </p>
+        <p style="font-size: 0.95rem;">San Francisco, CA · +1 (628) 724-8570</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container">
+    <p>© 2026 Dmytro Komarchuk. Technical Architect · PhD · EB-1A.</p>
+  </footer>
+
+  <script>
+    (function() {
+      function initSmoothScroll() {
+        var links = document.querySelectorAll('a[href^="#"]');
+        for (var i = 0; i < links.length; i++) {
+          links[i].addEventListener('click', function(e) {
+            var href = this.getAttribute('href');
+            if (href === '#') return;
+            e.preventDefault();
+            var target = document.querySelector(href);
+            if (target) {
+              if ('scrollBehavior' in document.documentElement.style) {
+                target.scrollIntoView({ behavior: 'smooth' });
+              } else {
+                target.scrollIntoView();
+              }
+            }
+          });
+        }
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSmoothScroll);
+      } else {
+        initSmoothScroll();
+      }
+    })();
+  </script>
+</body>
+</html>

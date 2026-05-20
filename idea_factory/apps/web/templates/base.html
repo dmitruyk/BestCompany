@@ -36,9 +36,13 @@
                     </a>
                     {% if user.is_authenticated %}
                         <span class="text-sm text-slate-500">{{ user.username }}</span>
-                        <a href="{% url 'admin:logout' %}" class="text-sm text-slate-500 hover:text-slate-700">Logout</a>
+                        {% if user.is_staff %}
+                        <a href="{% url 'llm_settings' %}" class="text-sm text-slate-500 hover:text-slate-700">LLM</a>
+                        <a href="{% url 'admin:index' %}" class="text-sm text-slate-500 hover:text-slate-700">Admin</a>
+                        {% endif %}
+                        <a href="{% url 'app_logout' %}" class="text-sm text-slate-500 hover:text-slate-700">Logout</a>
                     {% else %}
-                        <a href="{% url 'admin:login' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">Login</a>
+                        <a href="{% url 'app_login' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">Login</a>
                     {% endif %}
                 </div>
             </div>

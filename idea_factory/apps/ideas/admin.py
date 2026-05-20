@@ -7,8 +7,10 @@ from .models import (
     Company,
     CompanyAgent,
     CompanyCalendarAction,
+    CompanyTeamMember,
     DirectorDiscussion,
     DiscussionMessage,
+    IdeaAttachment,
     IdeaConclusion,
     IdeaRequest,
     UserAgentMessage,
@@ -63,6 +65,13 @@ class AgentMessageAdmin(admin.ModelAdmin):
     list_filter = ("kind",)
 
 
+@admin.register(IdeaAttachment)
+class IdeaAttachmentAdmin(admin.ModelAdmin):
+    list_display = ("original_filename", "idea_request", "file_size", "created_at")
+    search_fields = ("original_filename",)
+    readonly_fields = ("id", "extracted_text", "created_at")
+
+
 @admin.register(IdeaConclusion)
 class IdeaConclusionAdmin(admin.ModelAdmin):
     """Admin for IdeaConclusion."""
@@ -104,6 +113,12 @@ class ActionProposalAdmin(admin.ModelAdmin):
 @admin.register(UserAgentMessage)
 class UserAgentMessageAdmin(admin.ModelAdmin):
     list_display = ("user", "agent", "created_at")
+
+
+@admin.register(CompanyTeamMember)
+class CompanyTeamMemberAdmin(admin.ModelAdmin):
+    list_display = ("name", "company", "role", "is_active", "email", "created_at")
+    list_filter = ("role", "is_active")
 
 
 @admin.register(CompanyCalendarAction)

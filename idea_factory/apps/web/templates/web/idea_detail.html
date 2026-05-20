@@ -73,10 +73,58 @@
     </div>
 </div>
 
+{% if attachment_warnings %}
+<div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+    <p class="font-medium">Some attachments were not saved</p>
+    <ul class="text-sm mt-1 list-disc list-inside">
+        {% for msg in attachment_warnings %}
+        <li>{{ msg }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
     <h2 class="text-lg font-semibold text-slate-900 mb-2">Request</h2>
     <p class="text-slate-600 whitespace-pre-wrap">{{ idea.prompt }}</p>
 </div>
+
+{% if attachments %}
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-3">PDF context documents</h2>
+    <ul class="space-y-2">
+        {% for att in attachments %}
+        <li class="flex flex-wrap items-center gap-3 text-sm">
+            <a href="{{ att.file.url }}" class="text-indigo-600 hover:text-indigo-800 font-medium" target="_blank" rel="noopener noreferrer">{{ att.original_filename }}</a>
+            <span class="text-slate-500">{{ att.file_size|filesizeformat }}</span>
+            {% if att.extracted_text %}
+            <span class="text-emerald-600">text extracted</span>
+            {% else %}
+            <span class="text-amber-600">no text extracted</span>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% if can_add_attachments %}
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-2">Add PDF documents</h2>
+    <p class="text-sm text-slate-500 mb-3">Upload more context PDFs. Rerun the pipeline from scratch to include new documents in agent analysis.</p>
+    <form method="post" action="{% url 'add_idea_attachment' pk=idea.pk %}" enctype="multipart/form-data" class="flex flex-wrap items-end gap-4">
+        {% csrf_token %}
+        <div class="flex-1 min-w-[200px]">
+            <label for="pdf_documents" class="sr-only">PDF documents</label>
+            <input type="file" name="pdf_documents" id="pdf_documents" accept="application/pdf,.pdf" multiple
+                class="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200">
+        </div>
+        <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            Upload PDFs
+        </button>
+    </form>
+</div>
+{% endif %}
 
 {% if conclusion or result_bundle.final_summary %}
 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">

@@ -10,12 +10,22 @@
     </a>
 </div>
 
+<div class="mb-6 p-4 rounded-lg bg-slate-50 border border-slate-200 text-sm flex flex-wrap justify-between gap-2 items-center">
+    <p class="text-slate-600">
+        Service LLM: <span class="font-medium text-slate-800">{{ service_llm.provider }}</span>
+        · {{ service_llm.model_id_for_provider }}
+    </p>
+    {% if user.is_staff %}
+    <a href="{% url 'llm_settings' %}" class="text-indigo-600 hover:text-indigo-800 font-medium">Change provider</a>
+    {% endif %}
+</div>
+
 {% if provider_error %}
 <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
     <p class="font-medium">Provider configuration error</p>
     <p class="text-sm mt-1">{{ provider_error }}</p>
-    <p class="text-sm mt-2">Set <code class="bg-amber-100 px-1 rounded">LLM_PROVIDER</code>, <code class="bg-amber-100 px-1 rounded">OLLAMA_HOST</code> (for Ollama), or <code class="bg-amber-100 px-1 rounded">OPENAI_API_KEY</code> (for OpenAI).</p>
-</div>
+    {% if user.is_staff %}<p class="text-sm mt-2"><a href="{% url 'llm_settings' %}" class="underline">Open LLM settings</a></p>{% endif %}
+</motion>
 {% endif %}
 
 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

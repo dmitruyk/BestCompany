@@ -7,6 +7,15 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+_env_file = BASE_DIR / ".env"
+if _env_file.exists():
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(_env_file)
+    except ImportError:
+        pass
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
@@ -16,7 +25,37 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+
+def _env_list(name, default=""):
+    raw = os.environ.get(name, default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+ALLOWED_HOSTS = _env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
+CSRF_TRUSTED_ORIGINS = _env_list("CSRF_TRUSTED_ORIGINS")
+
+# Optional single hostname for production (also appended to ALLOWED_HOSTS / CSRF).
+_public_host = os.environ.get("DJANGO_PUBLIC_HOST", "").strip()
+if _public_host:
+    if _public_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_public_host)
+    _https_origin = f"https://{_public_host}"
+    if _https_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_https_origin)
+
+# Synology (or other) reverse proxy terminates TLS and forwards HTTP with X-Forwarded-* headers.
+BEHIND_REVERSE_PROXY = os.environ.get(
+    "DJANGO_BEHIND_REVERSE_PROXY", ""
+).lower() in ("true", "1", "yes")
+if BEHIND_REVERSE_PROXY:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    if BEHIND_REVERSE_PROXY:
+        SECURE_SSL_REDIRECT = True
 
 # Application definition
 INSTALLED_APPS = [
@@ -38,6 +77,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.core.middleware.MustChangePasswordMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -62,14 +102,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "idea_factory.wsgi.application"
 
-# Database - SQLite (use absolute path for subprocess compatibility)
-_db_path = os.environ.get("IDEA_FACTORY_DB")
-if _db_path is None:
-    _db_path = str(BASE_DIR / "db.sqlite3")
+# Database - PostgreSQL (configure via .env or environment variables)
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": _db_path,
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DB_NAME", "idea_factory"),
+        "USER": os.environ.get("DB_USER", "postgres"),
+        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+        "HOST": os.environ.get("DB_HOST", "192.168.0.230"),
+        "PORT": os.environ.get("DB_PORT", "5440"),
     }
 }
 
@@ -92,13 +133,17 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "apps" / "web" / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Uploaded files (PDF attachments on ideas)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Login redirect - use Django admin for MVP
-LOGIN_URL = "/admin/login/"
+# Authentication
+LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/login/"
 
 # Logging - write to file (IDEA_FACTORY_LOG_FILE env overrides path)
 LOG_DIR = BASE_DIR / "logs"

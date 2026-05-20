@@ -48,6 +48,24 @@ Primary agents run in sequence. After each (except Overviewer), **EvaluatorAgent
 
 **PromptGeneratorAgent**: When Evaluator rejects, produces improved_instructions for retry.
 
+## Autonomous Company Loop
+
+When a company has `autonomous_mode=True` (default), the system runs without user action:
+
+1. **Plans**: Directors discuss and propose actions (Agent pipeline).
+2. **Selection**: Selector agent picks best 1–2 actions from proposals.
+3. **Scheduling**: Scheduler agent assigns actions to calendar dates.
+4. **Execution**: On due date, executor agent completes actions (notes, marks DONE).
+5. **Improvement**: Checker agent evaluates completed actions; spawns improvement discussion if needed.
+6. **Cycle**: When idle, auto-starts "Next steps" discussion; loop repeats.
+
+Run the autonomous loop via cron:
+```bash
+0 9 * * * cd /path/to/idea_factory && python manage.py run_autonomous_loop
+```
+
+Toggle autonomous mode per company from the company detail page (🤖 Self-Run / 👤 Manual).
+
 ## Confidence Scoring
 
 - Base: from model's structured output

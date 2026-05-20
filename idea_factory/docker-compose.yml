@@ -1,0 +1,16 @@
+# Config is baked into the image from local .env at build time (make build-push-docker).
+# Optional: uncomment env_file to override without rebuilding.
+#   env_file:
+#     - .env
+
+services:
+  idea-factory:
+    image: ${REGISTRY_IMAGE:-192.168.0.230:5005/idea-factory:latest}
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - idea-factory-media:/app/media
+    restart: unless-stopped
+
+volumes:
+  idea-factory-media:

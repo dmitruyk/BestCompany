@@ -12,12 +12,17 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from django.utils.dateparse import parse_date
 
+from apps.ideas.attachments import save_idea_attachments
+from apps.ideas.best_practices import assess_company_readiness
+from apps.ideas.context import build_idea_request_prompt
+from apps.ideas.development_plan import get_development_plan_summary
 from apps.ideas.models import (
     ActionProposal,
     AgentRun,
     Company,
     CompanyAgent,
     CompanyCalendarAction,
+    CompanyTeamMember,
     IdeaConclusion,
     IdeaRequest,
 )
@@ -32,27 +37,51 @@ OLLAMA_MODELS = [
     ("qwen3-coder", "qwen3-coder"),
 ]
 
+# OpenAI models — gpt-4o-mini is the default (best cost vs quality for structured agents).
+OPENAI_MODELS = [
+    ("gpt-4o-mini", "gpt-4o-mini (recommended)"),
+    ("gpt-4o", "gpt-4o (higher quality, higher cost)"),
+]
+
 
 def _provider_error() -> Optional[str]:
-    """Return error message if provider misconfigured."""
-    try:
-        from apps.agents.providers import get_model
-        get_model()
-        return None
-    except (ValueError, ImportError) as e:
-        return str(e)
+    """Return error message if active service LLM provider is misconfigured."""
+    from apps.agents.providers import validate_provider_config
+
+    return validate_provider_config()
+
+
+def _new_idea_form_context(request: HttpRequest, **extra) -> dict:
+    """Shared template context for the new-idea form."""
+    from apps.agents.llm_settings import get_service_llm_settings
+
+    svc = get_service_llm_settings()
+    return {
+        "provider_error": _provider_error(),
+        "service_llm": svc,
+        "providers": IdeaRequest.Provider.choices,
+        "ollama_models": OLLAMA_MODELS,
+        "openai_models": OPENAI_MODELS,
+        "default_provider": svc.provider,
+        **extra,
+    }
 
 
 @login_required
 @require_http_methods(["GET"])
 def home(request: HttpRequest) -> HttpResponse:
     """List all idea requests."""
+    from apps.agents.llm_settings import get_service_llm_settings
+
     requests = IdeaRequest.objects.all()[:50]
-    provider_error = _provider_error()
     return render(
         request,
         "web/home.html",
-        {"idea_requests": requests, "provider_error": provider_error},
+        {
+            "idea_requests": requests,
+            "provider_error": _provider_error(),
+            "service_llm": get_service_llm_settings(),
+        },
     )
 
 
@@ -60,33 +89,27 @@ def home(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET", "POST"])
 def new_idea(request: HttpRequest) -> HttpResponse:
     """Create new idea request form and handle run now."""
-    provider_error = _provider_error()
     if request.method == "POST":
         title = request.POST.get("title", "").strip() or "Untitled"
         prompt = request.POST.get("prompt", "").strip()
-        provider = request.POST.get("provider", "ollama")
+        from apps.agents.llm_settings import get_service_llm_settings
+
+        provider = request.POST.get("provider", get_service_llm_settings().provider)
         model_id = request.POST.get("model_id", "").strip()
         if not prompt:
             return render(
                 request,
                 "web/new_idea.html",
-                {
-                    "error": "Prompt is required.",
-                    "provider_error": provider_error,
-                    "providers": IdeaRequest.Provider.choices,
-                    "ollama_models": OLLAMA_MODELS,
-                },
+                _new_idea_form_context(request, error="Prompt is required."),
             )
+        provider_error = _provider_error()
         if provider_error:
             return render(
                 request,
                 "web/new_idea.html",
-                {
-                    "error": f"Provider error: {provider_error}",
-                    "provider_error": provider_error,
-                    "providers": IdeaRequest.Provider.choices,
-                    "ollama_models": OLLAMA_MODELS,
-                },
+                _new_idea_form_context(
+                    request, error=f"Provider error: {provider_error}"
+                ),
             )
         idea = IdeaRequest.objects.create(
             title=title,
@@ -96,18 +119,14 @@ def new_idea(request: HttpRequest) -> HttpResponse:
             model_id=model_id,
             owner=request.user,
         )
+        uploads = request.FILES.getlist("pdf_documents")
+        attachment_errors = save_idea_attachments(idea, uploads) if uploads else []
         idea_pk = str(idea.pk)
         _spawn_pipeline_process(idea_pk)
+        if attachment_errors:
+            request.session[f"idea_{idea_pk}_attachment_warnings"] = attachment_errors
         return redirect("idea_detail", pk=idea_pk)
-    return render(
-        request,
-        "web/new_idea.html",
-        {
-            "provider_error": provider_error,
-            "providers": IdeaRequest.Provider.choices,
-            "ollama_models": OLLAMA_MODELS,
-        },
-    )
+    return render(request, "web/new_idea.html", _new_idea_form_context(request))
 
 
 def _build_result_bundle(idea: IdeaRequest) -> dict:
@@ -148,18 +167,38 @@ def idea_detail(request: HttpRequest, pk: str) -> HttpResponse:
     result_bundle = _build_result_bundle(idea)
     result_json_str = json.dumps(result_bundle)
     has_failed_runs = idea.agent_runs.filter(status=AgentRun.RunStatus.FAILED).exists()
+    session_key = f"idea_{pk}_attachment_warnings"
+    attachment_warnings = request.session.pop(session_key, [])
     return render(
         request,
         "web/idea_detail.html",
         {
             "idea": idea,
+            "attachments": idea.attachments.all(),
+            "attachment_warnings": attachment_warnings,
             "runs": runs,
             "conclusion": conclusion,
             "result_bundle": result_bundle,
             "result_json_str": result_json_str,
             "has_failed_runs": has_failed_runs,
+            "can_add_attachments": idea.status != IdeaRequest.Status.RUNNING,
         },
     )
+
+
+@login_required
+@require_POST
+def add_idea_attachment(request: HttpRequest, pk: str) -> HttpResponse:
+    """Upload additional PDF context documents to an existing idea."""
+    idea = get_object_or_404(IdeaRequest, pk=pk)
+    if idea.status == IdeaRequest.Status.RUNNING:
+        return redirect("idea_detail", pk=pk)
+    uploads = request.FILES.getlist("pdf_documents")
+    if uploads:
+        errors = save_idea_attachments(idea, uploads)
+        if errors:
+            request.session[f"idea_{pk}_attachment_warnings"] = errors
+    return redirect("idea_detail", pk=pk)
 
 
 def _get_project_root() -> str:
@@ -168,13 +207,11 @@ def _get_project_root() -> str:
 
 
 def _get_subprocess_env() -> dict:
-    """Build env for subprocess - use same DB path as Django server."""
-    from django.conf import settings
+    """Build env for subprocess - same database and PYTHONPATH as Django server."""
+    from apps.core.subprocess_env import enrich_subprocess_env
 
     root = _get_project_root()
-    env = os.environ.copy()
-    db_name = settings.DATABASES["default"]["NAME"]
-    env["IDEA_FACTORY_DB"] = os.path.abspath(db_name) if not os.path.isabs(db_name) else db_name
+    env = enrich_subprocess_env()
     env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
     return env
 
@@ -217,6 +254,17 @@ def _spawn_fleet_process(idea_pk: str) -> None:
     root = _get_project_root()
     subprocess.Popen(
         [sys.executable, os.path.join(root, "manage.py"), "run_fleet", idea_pk],
+        cwd=root,
+        env=_get_subprocess_env(),
+        start_new_session=True,
+    )
+
+
+def _spawn_regenerate_agents_process(company_pk: str) -> None:
+    """Spawn agent regeneration via manage.py in a separate Python process."""
+    root = _get_project_root()
+    subprocess.Popen(
+        [sys.executable, os.path.join(root, "manage.py"), "run_regenerate_agents", company_pk],
         cwd=root,
         env=_get_subprocess_env(),
         start_new_session=True,
@@ -371,15 +419,75 @@ def company_list(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_http_methods(["GET"])
 def company_detail(request: HttpRequest, pk: str) -> HttpResponse:
-    """Company detail: agents, discussions, actions."""
+    """Company detail: agents, humans, discussions, readiness checks."""
     company = get_object_or_404(Company, pk=pk, owner=request.user)
     agents = company.agents.all()
     discussions = company.discussions.all()[:10]
+    team_members = company.team_members.filter(is_active=True)
+    readiness = assess_company_readiness(company)
+    dev_plan = get_development_plan_summary(company.idea_request)
     return render(
         request,
         "web/company_detail.html",
-        {"company": company, "agents": agents, "discussions": discussions},
+        {
+            "company": company,
+            "agents": agents,
+            "discussions": discussions,
+            "team_members": team_members,
+            "readiness": readiness,
+            "dev_plan": dev_plan,
+            "human_roles": CompanyTeamMember.Role.choices,
+        },
     )
+
+
+@login_required
+@require_POST
+def add_team_member(request: HttpRequest, pk: str) -> HttpResponse:
+    """Add a human team member to the company."""
+    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    name = request.POST.get("name", "").strip()
+    role = request.POST.get("role", CompanyTeamMember.Role.OTHER)
+    email = request.POST.get("email", "").strip()
+    if name and role in dict(CompanyTeamMember.Role.choices):
+        CompanyTeamMember.objects.create(
+            company=company,
+            name=name,
+            role=role,
+            email=email,
+        )
+    return redirect("company_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def toggle_autonomous_mode(request: HttpRequest, pk: str) -> HttpResponse:
+    """Toggle autonomous mode - agents select, schedule, execute without user action."""
+    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    company.autonomous_mode = not company.autonomous_mode
+    company.save(update_fields=["autonomous_mode", "updated_at"])
+    return redirect("company_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def regenerate_agents(request: HttpRequest, pk: str) -> HttpResponse:
+    """Regenerate agent fleet based on current company state."""
+    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    if company.status == Company.Status.REGENERATING_AGENTS:
+        return redirect("company_detail", pk=pk)
+    _spawn_regenerate_agents_process(str(company.pk))
+    company.status = Company.Status.REGENERATING_AGENTS
+    company.save(update_fields=["status", "updated_at"])
+    return redirect("company_detail", pk=pk)
+
+
+@login_required
+@require_http_methods(["GET"])
+def company_status(request: HttpRequest, pk: str) -> JsonResponse:
+    """JSON status for company polling (e.g. when regenerating agents)."""
+    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    return JsonResponse({"status": company.status})
 
 
 @login_required
@@ -424,7 +532,6 @@ def _get_calendar_context(company: Company) -> str:
     start_date = _company_start_date(company)
     today = timezone.localdate()
     end = today + timedelta(days=30)
-    end = today + timedelta(days=30)
     entries = CompanyCalendarAction.objects.filter(
         company=company, action_date__gte=start_date, action_date__lte=end
     ).order_by("action_date", "title")[:60]
@@ -457,8 +564,8 @@ def _get_agent_response(
             return "Unable to connect to AI. Check provider configuration."
         calendar_ctx = _get_calendar_context(company)
         context = f"""Company: {company.name}
-Idea: {idea.title}
-{idea.prompt}
+Idea:
+{build_idea_request_prompt(idea)}
 
 {calendar_ctx}
 
@@ -485,33 +592,11 @@ The user is the owner and main investor. You have access to the company calendar
 
 def _get_provider_model_for_idea(idea: IdeaRequest):
     """Get LLM model for idea's provider settings."""
-    import os
-    from apps.agents.providers import get_model
+    from apps.agents.providers import get_model_for_idea, validate_provider_config
 
-    prev_provider = os.environ.get("LLM_PROVIDER")
-    prev_ollama = os.environ.get("OLLAMA_MODEL_ID")
-    prev_openai = os.environ.get("OPENAI_MODEL")
-    try:
-        os.environ["LLM_PROVIDER"] = idea.provider
-        if idea.model_id:
-            if idea.provider == "ollama":
-                os.environ["OLLAMA_MODEL_ID"] = idea.model_id
-            else:
-                os.environ["OPENAI_MODEL"] = idea.model_id
-        return get_model()
-    finally:
-        if prev_provider is not None:
-            os.environ["LLM_PROVIDER"] = prev_provider
-        elif "LLM_PROVIDER" in os.environ:
-            del os.environ["LLM_PROVIDER"]
-        if prev_ollama is not None:
-            os.environ["OLLAMA_MODEL_ID"] = prev_ollama
-        elif "OLLAMA_MODEL_ID" in os.environ:
-            del os.environ["OLLAMA_MODEL_ID"]
-        if prev_openai is not None:
-            os.environ["OPENAI_MODEL"] = prev_openai
-        elif "OPENAI_MODEL" in os.environ:
-            del os.environ["OPENAI_MODEL"]
+    if validate_provider_config(idea.provider):
+        return None
+    return get_model_for_idea(idea)
 
 
 @login_required
@@ -869,7 +954,7 @@ def _run_director_discussion(discussion) -> None:
         base_context = (
             f"Company: {discussion.company.name}\n"
             f"Topic: {discussion.topic}\n"
-            f"Idea: {idea.title}\n{idea.prompt}\n\n"
+            f"Idea:\n{build_idea_request_prompt(idea)}\n\n"
         )
         prior_messages: list[str] = []
         for director in directors:
@@ -910,6 +995,9 @@ def _run_director_discussion(discussion) -> None:
                     )
         discussion.status = DirectorDiscussion.Status.AWAITING_SELECTION
         discussion.save(update_fields=["status"])
+        if discussion.company.autonomous_mode:
+            from apps.agents.autonomous import agent_select_actions
+            agent_select_actions(discussion)
     except Exception as e:
         logger.exception("Director discussion failed: %s", e)
         discussion.status = DirectorDiscussion.Status.FAILED

@@ -1,7 +1,15 @@
 """Data models for idea requests and agent runs."""
+import os
 import uuid
+
 from django.conf import settings
+from django.core.validators import FileExtensionValidator
 from django.db import models
+
+
+def idea_attachment_upload_to(instance: "IdeaAttachment", filename: str) -> str:
+    ext = os.path.splitext(filename)[1].lower() or ".pdf"
+    return f"idea_attachments/{instance.idea_request_id}/{uuid.uuid4()}{ext}"
 
 
 class IdeaRequest(models.Model):
@@ -61,6 +69,33 @@ class IdeaRequest(models.Model):
 
     def __str__(self) -> str:
         return f"{self.title} ({self.status})"
+
+
+class IdeaAttachment(models.Model):
+    """PDF document attached to an idea for additional LLM context."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    idea_request = models.ForeignKey(
+        IdeaRequest, on_delete=models.CASCADE, related_name="attachments"
+    )
+    file = models.FileField(
+        upload_to=idea_attachment_upload_to,
+        validators=[FileExtensionValidator(allowed_extensions=["pdf"])],
+    )
+    original_filename = models.CharField(max_length=255)
+    extracted_text = models.TextField(
+        blank=True,
+        default="",
+        help_text="Plain text extracted from the PDF for agent context",
+    )
+    file_size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return self.original_filename
 
 
 class AgentRun(models.Model):
@@ -157,6 +192,7 @@ class Company(models.Model):
     class Status(models.TextChoices):
         INITIALIZING = "INITIALIZING", "Initializing"
         ACTIVE = "ACTIVE", "Active"
+        REGENERATING_AGENTS = "REGENERATING_AGENTS", "Regenerating Agents"
         COMPLETED = "COMPLETED", "Completed"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -171,6 +207,10 @@ class Company(models.Model):
     )
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.INITIALIZING
+    )
+    autonomous_mode = models.BooleanField(
+        default=True,
+        help_text="When True, agents select plans, schedule, execute, and improve without user action",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -187,13 +227,16 @@ class CompanyAgent(models.Model):
     """Persistent agent in a company fleet - CPA, Director, Marketer, etc."""
 
     class Role(models.TextChoices):
-        CPA = "cpa", "CPA (Budget & Finance)"
+        FOUNDER = "founder", "Founder (AI)"
+        FOUNDER_ASSISTANT = "founder_assistant", "Founder Assistant (AI)"
         DIRECTOR = "director", "Director"
+        PLANNER = "planner", "Planner"
+        QA = "qa", "QA / Quality"
+        CPA = "cpa", "CPA (Budget & Finance)"
         MARKETER = "marketer", "Marketer"
         DEVELOPER = "developer", "Developer"
         PRODUCT = "product", "Product Manager"
         OPERATIONS = "operations", "Operations"
-        CUSTOM = "custom", "Custom"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company = models.ForeignKey(
@@ -355,3 +398,35 @@ class CompanyCalendarAction(models.Model):
 
     def __str__(self) -> str:
         return f"{self.title} ({self.action_date})"
+
+
+class CompanyTeamMember(models.Model):
+    """Human participant in company development (founders, assistants, QA, etc.)."""
+
+    class Role(models.TextChoices):
+        FOUNDER = "founder", "Founder"
+        FOUNDER_ASSISTANT = "founder_assistant", "Founder Assistant"
+        DIRECTOR = "director", "Director (Human)"
+        PLANNER = "planner", "Planner"
+        QA = "qa", "QA"
+        ACCOUNTANT = "accountant", "Accountant"
+        MARKETING = "marketing", "Marketing"
+        OPERATIONS = "operations", "Operations"
+        OTHER = "other", "Other"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="team_members"
+    )
+    name = models.CharField(max_length=120)
+    email = models.EmailField(blank=True, default="")
+    role = models.CharField(max_length=30, choices=Role.choices)
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["role", "name"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.get_role_display()})"

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}LLM Settings - Idea Factory{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    <h1 class="text-2xl font-bold text-slate-900 mb-2">LLM configuration</h1>
+    <p class="text-sm text-slate-500 mb-6">
+        Service-wide default for new ideas, agent fleet, and autonomous loop.
+        Switch between <strong>Ollama</strong> (local) and <strong>OpenAI</strong>.
+        Per-idea overrides remain available on the New Idea form.
+    </p>
+
+    <div class="mb-6 p-4 rounded-lg bg-slate-100 border border-slate-200 text-sm">
+        <p class="font-medium text-slate-800">Active now</p>
+        <p class="text-slate-600 mt-1">
+            Provider: <span class="font-medium">{{ active_settings.provider }}</span>
+            · Model: <span class="font-medium">{{ active_settings.model_id_for_provider }}</span>
+        </p>
+        {% if active_settings.provider == 'openai' %}
+        <p class="text-slate-600 mt-1">
+            API key: {% if openai_key_set %}<span class="text-emerald-600">set in .env</span>{% else %}<span class="text-red-600">missing — set OPENAI_API_KEY in .env</span>{% endif %}
+        </p>
+        {% else %}
+        <p class="text-slate-600 mt-1">Ollama host: {{ active_settings.ollama_host }}</p>
+        {% endif %}
+    </div>
+
+    {% if provider_error %}
+    <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+        <p class="font-medium">Configuration issue</p>
+        <p class="text-sm mt-1">{{ provider_error }}</p>
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'llm_settings' %}" class="space-y-5 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        {% csrf_token %}
+        <div>
+            <label for="id_default_provider" class="block text-sm font-medium text-slate-700 mb-1">Default provider</label>
+            {{ form.default_provider }}
+        </div>
+        <div id="ollama-fields" class="space-y-4 border-t border-slate-200 pt-4">
+            <p class="text-sm font-medium text-slate-700">Ollama settings</p>
+            <div>
+                <label for="id_ollama_host" class="block text-xs font-medium text-slate-600 mb-1">Host URL</label>
+                {{ form.ollama_host }}
+            </div>
+            <div>
+                <label for="id_ollama_model_id" class="block text-xs font-medium text-slate-600 mb-1">Model ID</label>
+                {{ form.ollama_model_id }}
+                <p class="text-xs text-slate-500 mt-1">Examples: {% for value, label in ollama_models %}{{ value }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+            </div>
+        </div>
+        <div id="openai-fields" class="space-y-4 border-t border-slate-200 pt-4">
+            <p class="text-sm font-medium text-slate-700">OpenAI settings</p>
+            <div>
+                <label for="id_openai_model_id" class="block text-xs font-medium text-slate-600 mb-1">Model ID</label>
+                {{ form.openai_model_id }}
+                <p class="text-xs text-slate-500 mt-1">API key is read from <code class="bg-slate-100 px-1 rounded">OPENAI_API_KEY</code> in .env only.</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-3 pt-2">
+            <button type="submit" class="inline-flex px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+                Save settings
+            </button>
+            <button type="button" id="test-llm-btn" class="inline-flex px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                Test connection
+            </button>
+        </div>
+        <p id="test-llm-result" class="text-sm hidden"></p>
+    </form>
+</div>
+
+<script>
+(function () {
+    const providerSelect = document.getElementById('id_default_provider');
+    const ollamaBlock = document.getElementById('ollama-fields');
+    const openaiBlock = document.getElementById('openai-fields');
+    const syncBlocks = () => {
+        const p = providerSelect.value;
+        ollamaBlock.style.display = p === 'ollama' ? 'block' : 'none';
+        openaiBlock.style.display = p === 'openai' ? 'block' : 'none';
+    };
+    providerSelect.addEventListener('change', syncBlocks);
+    syncBlocks();
+
+    const testBtn = document.getElementById('test-llm-btn');
+    const testResult = document.getElementById('test-llm-result');
+    testBtn.addEventListener('click', async () => {
+        testBtn.disabled = true;
+        testResult.classList.remove('hidden');
+        testResult.textContent = 'Testing…';
+        testResult.className = 'text-sm text-slate-600';
+        const formData = new FormData();
+        formData.append('provider', providerSelect.value);
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        try {
+            const res = await fetch('{% url "llm_settings_test" %}', { method: 'POST', body: formData });
+            const data = await res.json();
+            testResult.textContent = data.message;
+            testResult.className = data.ok ? 'text-sm text-emerald-700' : 'text-sm text-red-700';
+        } catch (e) {
+            testResult.textContent = 'Request failed: ' + e;
+            testResult.className = 'text-sm text-red-700';
+        }
+        testBtn.disabled = false;
+    });
+})();
+</script>
+{% endblock %}

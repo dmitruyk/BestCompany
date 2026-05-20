@@ -1,12 +1,22 @@
 """URL configuration for web app."""
 from django.urls import path
 
-from . import views
+from . import auth_views, llm_settings_views, views
 
 urlpatterns = [
+    path("login/", auth_views.app_login, name="app_login"),
+    path("logout/", auth_views.app_logout, name="app_logout"),
+    path(
+        "password-change-required/",
+        auth_views.force_password_change,
+        name="force_password_change",
+    ),
+    path("settings/llm/", llm_settings_views.llm_settings, name="llm_settings"),
+    path("settings/llm/test/", llm_settings_views.llm_settings_test, name="llm_settings_test"),
     path("", views.home, name="home"),
     path("ideas/new/", views.new_idea, name="new_idea"),
     path("ideas/<uuid:pk>/", views.idea_detail, name="idea_detail"),
+    path("ideas/<uuid:pk>/attachments/", views.add_idea_attachment, name="add_idea_attachment"),
     path("ideas/<uuid:pk>/status/", views.idea_status, name="idea_status"),
     path("ideas/<uuid:pk>/accept/", views.accept_idea, name="accept_idea"),
     path("ideas/<uuid:pk>/stop/", views.stop_pipeline, name="stop_pipeline"),
@@ -18,6 +28,10 @@ urlpatterns = [
     path("ideas/<uuid:pk>/download/", views.download_json, name="download_json"),
     path("companies/", views.company_list, name="company_list"),
     path("companies/<uuid:pk>/", views.company_detail, name="company_detail"),
+    path("companies/<uuid:pk>/team/add/", views.add_team_member, name="add_team_member"),
+    path("companies/<uuid:pk>/toggle-autonomous/", views.toggle_autonomous_mode, name="toggle_autonomous_mode"),
+    path("companies/<uuid:pk>/regenerate-agents/", views.regenerate_agents, name="regenerate_agents"),
+    path("companies/<uuid:pk>/status/", views.company_status, name="company_status"),
     path("companies/<uuid:company_pk>/agents/<uuid:agent_pk>/chat/", views.company_agent_chat, name="company_agent_chat"),
     path("companies/<uuid:company_pk>/agents/<uuid:agent_pk>/chat/send/", views.agent_chat_send, name="agent_chat_send"),
     path("companies/<uuid:company_pk>/discussions/new/", views.start_discussion, name="start_discussion"),

@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional
 from django.db import IntegrityError
 from django.utils import timezone
 
+from apps.ideas.context import build_idea_request_prompt
 from apps.ideas.models import AgentRun, IdeaConclusion, IdeaRequest
 
 from .agents import (
@@ -20,7 +21,7 @@ from .agents import (
     run_prompt_generator,
 )
 from .confidence import adjust_confidence, count_unknown_assumptions
-from .providers import get_model
+from .providers import get_model_for_idea, validate_provider_config
 from .schemas import (
     CritiqueOutput,
     EstimateOutput,
@@ -102,33 +103,13 @@ def _load_context_from_runs(idea_request: IdeaRequest) -> dict[str, Any]:
 def _get_provider_model(idea_request: IdeaRequest) -> Optional[Any]:
     """Get model for idea_request provider. Returns None on error."""
     try:
-        prev_provider = os.environ.get("LLM_PROVIDER")
-        prev_ollama_model = os.environ.get("OLLAMA_MODEL_ID")
-        prev_openai_model = os.environ.get("OPENAI_MODEL")
-
-        os.environ["LLM_PROVIDER"] = idea_request.provider
-        if idea_request.model_id:
-            if idea_request.provider == "ollama":
-                os.environ["OLLAMA_MODEL_ID"] = idea_request.model_id
-            else:
-                os.environ["OPENAI_MODEL"] = idea_request.model_id
-
-        try:
-            return get_model()
-        finally:
-            if prev_provider is not None:
-                os.environ["LLM_PROVIDER"] = prev_provider
-            elif "LLM_PROVIDER" in os.environ:
-                del os.environ["LLM_PROVIDER"]
-            if prev_ollama_model is not None:
-                os.environ["OLLAMA_MODEL_ID"] = prev_ollama_model
-            elif "OLLAMA_MODEL_ID" in os.environ and idea_request.model_id:
-                del os.environ["OLLAMA_MODEL_ID"]
-            if prev_openai_model is not None:
-                os.environ["OPENAI_MODEL"] = prev_openai_model
-            elif "OPENAI_MODEL" in os.environ and idea_request.model_id:
-                del os.environ["OPENAI_MODEL"]
-    except (ValueError, ImportError):
+        err = validate_provider_config(idea_request.provider)
+        if err:
+            logger.error("Provider config error: %s", err)
+            return None
+        return get_model_for_idea(idea_request)
+    except (ValueError, ImportError) as e:
+        logger.error("Provider setup failed: %s", e)
         return None
 
 
@@ -139,7 +120,7 @@ def _run_steps(
     start_index: int,
 ) -> None:
     """Run pipeline steps from start_index to end, with evaluate-and-retry loop."""
-    request_prompt = f"{idea_request.title}\n\n{idea_request.prompt}"
+    request_prompt = build_idea_request_prompt(idea_request)
     agent_outputs = {
         k: v.model_dump() if hasattr(v, "model_dump") else v
         for k, v in context.items()
