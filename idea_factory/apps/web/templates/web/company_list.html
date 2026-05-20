@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}My Companies - Idea Factory{% endblock %}
+{% block title %}{% if is_app_admin %}Companies{% else %}My Companies{% endif %} - Idea Factory{% endblock %}
 
 {% block content %}
 <div class="flex justify-between items-center mb-8">
-    <h1 class="text-2xl font-bold text-slate-900">My Companies</h1>
+    <h1 class="text-2xl font-bold text-slate-900">{% if is_app_admin %}All Companies{% else %}My Companies{% endif %}</h1>
     <a href="{% url 'home' %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
         ← Back to Ideas
     </a>

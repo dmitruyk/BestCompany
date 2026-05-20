@@ -29,14 +29,17 @@
                 </a>
                 <div class="flex items-center gap-4">
                     <a href="{% url 'company_list' %}" class="text-sm font-medium text-slate-600 hover:text-indigo-600">
-                        My Companies
+                        {% if is_app_admin %}Companies{% else %}My Companies{% endif %}
                     </a>
+                    {% if can_create_ideas %}
                     <a href="{% url 'new_idea' %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">
                         New Request
                     </a>
+                    {% endif %}
                     {% if user.is_authenticated %}
                         <span class="text-sm text-slate-500">{{ user.username }}</span>
-                        {% if user.is_staff %}
+                        {% if is_app_admin %}
+                        <a href="{% url 'user_list' %}" class="text-sm text-slate-500 hover:text-slate-700">Users</a>
                         <a href="{% url 'llm_settings' %}" class="text-sm text-slate-500 hover:text-slate-700">LLM</a>
                         <a href="{% url 'admin:index' %}" class="text-sm text-slate-500 hover:text-slate-700">Admin</a>
                         {% endif %}

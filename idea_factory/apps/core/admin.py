@@ -11,7 +11,11 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
     extra = 0
-    fields = ("must_change_password",)
+    fields = (
+        "must_change_password",
+        "can_create_ideas",
+        "can_create_companies",
+    )
     readonly_fields = ()
 
 
@@ -34,8 +38,14 @@ class ServiceLLMConfigAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "must_change_password", "updated_at")
-    list_filter = ("must_change_password",)
+    list_display = (
+        "user",
+        "must_change_password",
+        "can_create_ideas",
+        "can_create_companies",
+        "updated_at",
+    )
+    list_filter = ("must_change_password", "can_create_ideas", "can_create_companies")
     search_fields = ("user__username", "user__email")
     raw_id_fields = ("user",)
 

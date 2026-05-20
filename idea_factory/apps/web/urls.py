@@ -1,7 +1,7 @@
 """URL configuration for web app."""
 from django.urls import path
 
-from . import auth_views, llm_settings_views, views
+from . import auth_views, llm_settings_views, user_views, views
 
 urlpatterns = [
     path("login/", auth_views.app_login, name="app_login"),
@@ -13,6 +13,9 @@ urlpatterns = [
     ),
     path("settings/llm/", llm_settings_views.llm_settings, name="llm_settings"),
     path("settings/llm/test/", llm_settings_views.llm_settings_test, name="llm_settings_test"),
+    path("settings/users/", user_views.user_list, name="user_list"),
+    path("settings/users/new/", user_views.user_create, name="user_create"),
+    path("settings/users/<int:user_id>/edit/", user_views.user_edit, name="user_edit"),
     path("", views.home, name="home"),
     path("ideas/new/", views.new_idea, name="new_idea"),
     path("ideas/<uuid:pk>/", views.idea_detail, name="idea_detail"),
@@ -30,6 +33,7 @@ urlpatterns = [
     path("companies/<uuid:pk>/", views.company_detail, name="company_detail"),
     path("companies/<uuid:pk>/team/add/", views.add_team_member, name="add_team_member"),
     path("companies/<uuid:pk>/toggle-autonomous/", views.toggle_autonomous_mode, name="toggle_autonomous_mode"),
+    path("companies/<uuid:pk>/run-autonomous-loop/", views.run_autonomous_loop_now, name="run_autonomous_loop_now"),
     path("companies/<uuid:pk>/regenerate-agents/", views.regenerate_agents, name="regenerate_agents"),
     path("companies/<uuid:pk>/status/", views.company_status, name="company_status"),
     path("companies/<uuid:company_pk>/agents/<uuid:agent_pk>/chat/", views.company_agent_chat, name="company_agent_chat"),

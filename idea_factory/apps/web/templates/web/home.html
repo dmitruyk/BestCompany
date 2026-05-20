@@ -5,9 +5,11 @@
 {% block content %}
 <div class="flex justify-between items-center mb-8">
     <h1 class="text-2xl font-bold text-slate-900">Idea Requests</h1>
+    {% if can_create_ideas %}
     <a href="{% url 'new_idea' %}" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
         + New Request
     </a>
+    {% endif %}
 </div>
 
 <div class="mb-6 p-4 rounded-lg bg-slate-50 border border-slate-200 text-sm flex flex-wrap justify-between gap-2 items-center">
@@ -15,7 +17,7 @@
         Service LLM: <span class="font-medium text-slate-800">{{ service_llm.provider }}</span>
         · {{ service_llm.model_id_for_provider }}
     </p>
-    {% if user.is_staff %}
+    {% if is_app_admin %}
     <a href="{% url 'llm_settings' %}" class="text-indigo-600 hover:text-indigo-800 font-medium">Change provider</a>
     {% endif %}
 </div>
@@ -24,8 +26,8 @@
 <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
     <p class="font-medium">Provider configuration error</p>
     <p class="text-sm mt-1">{{ provider_error }}</p>
-    {% if user.is_staff %}<p class="text-sm mt-2"><a href="{% url 'llm_settings' %}" class="underline">Open LLM settings</a></p>{% endif %}
-</motion>
+    {% if is_app_admin %}<p class="text-sm mt-2"><a href="{% url 'llm_settings' %}" class="underline">Open LLM settings</a></p>{% endif %}
+</div>
 {% endif %}
 
 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -33,6 +35,9 @@
         <thead class="bg-slate-50">
             <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Title</th>
+                {% if is_app_admin %}
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Owner</th>
+                {% endif %}
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Provider</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Created</th>
@@ -47,6 +52,9 @@
                         {{ req.title }}
                     </a>
                 </td>
+                {% if is_app_admin %}
+                <td class="px-6 py-4 text-sm text-slate-600">{{ req.owner.username|default:"—" }}</td>
+                {% endif %}
                 <td class="px-6 py-4">
                     <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
                         {% if req.status == 'SUCCEEDED' %}bg-green-100 text-green-800
@@ -66,7 +74,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="5" class="px-6 py-12 text-center text-slate-500">No idea requests yet. <a href="{% url 'new_idea' %}" class="text-indigo-600 hover:underline">Create one</a>.</td>
+                <td colspan="{% if is_app_admin %}6{% else %}5{% endif %}" class="px-6 py-12 text-center text-slate-500">No idea requests yet.{% if can_create_ideas %} <a href="{% url 'new_idea' %}" class="text-indigo-600 hover:underline">Create one</a>.{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>

@@ -112,6 +112,20 @@
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Director Discussions</h2>
         <p class="text-sm text-slate-500 mb-4">Directors discuss topics and propose actions. {% if company.autonomous_mode %}In Self-Run mode, agents select and execute.{% else %}You select which actions to implement.{% endif %}</p>
+        {% if unscheduled_selected_count > 0 %}
+        <form method="post" action="{% url 'run_autonomous_loop_now' pk=company.pk %}" class="mb-4">
+            {% csrf_token %}
+            <button type="submit"
+                class="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+                aria-label="Schedule {{ unscheduled_selected_count }} selected action{{ unscheduled_selected_count|pluralize }} on the calendar">
+                Schedule selected ({{ unscheduled_selected_count }})
+            </button>
+            <p class="text-xs text-slate-500 mt-2 max-w-xl">
+                {% if company.autonomous_mode %}Runs the self-run loop:{% else %}Schedules your selected actions and{% endif %}
+                adds them to the calendar and runs any items due today.
+            </p>
+        </form>
+        {% endif %}
         <a href="{% url 'start_discussion' company_pk=company.pk %}"
             class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 mb-4">
             Start New Discussion

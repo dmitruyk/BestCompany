@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Users - Idea Factory{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex justify-between items-center">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">Users</h1>
+        <p class="text-sm text-slate-500 mt-1">Create accounts with default passwords and control idea/company permissions.</p>
+    </div>
+    <a href="{% url 'user_create' %}" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+        + New user
+    </a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-slate-200">
+        <thead class="bg-slate-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Username</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Permissions</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+            {% for u in users %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4 font-medium text-slate-900">{{ u.username }}{% if u.is_staff %} <span class="text-xs text-indigo-600">(admin)</span>{% endif %}</td>
+                <td class="px-6 py-4 text-sm text-slate-600">{{ u.get_full_name|default:"—" }}</td>
+                <td class="px-6 py-4 text-sm text-slate-600">
+                    {% if u.profile.can_create_ideas %}Ideas{% endif %}
+                    {% if u.profile.can_create_ideas and u.profile.can_create_companies %} · {% endif %}
+                    {% if u.profile.can_create_companies %}Companies{% endif %}
+                    {% if not u.profile.can_create_ideas and not u.profile.can_create_companies %}—{% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm">
+                    {% if not u.is_active %}<span class="text-red-600">Inactive</span>
+                    {% elif u.profile.must_change_password %}<span class="text-amber-600">Password change required</span>
+                    {% else %}<span class="text-green-600">Active</span>{% endif %}
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <a href="{% url 'user_edit' user_id=u.pk %}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Edit</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="px-6 py-12 text-center text-slate-500">No users yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

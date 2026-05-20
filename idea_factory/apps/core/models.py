@@ -16,6 +16,14 @@ class UserProfile(models.Model):
         default=False,
         help_text="When True, user must set a new password before using the app.",
     )
+    can_create_ideas = models.BooleanField(
+        default=True,
+        help_text="User may create new idea requests in the web UI.",
+    )
+    can_create_companies = models.BooleanField(
+        default=True,
+        help_text="User may accept ideas and create companies (agent fleets).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

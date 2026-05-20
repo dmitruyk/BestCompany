@@ -54,6 +54,16 @@
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Action Proposals</h2>
         <p class="text-sm text-slate-500 mb-4">Select which actions to implement. You are the owner and make the final decision.</p>
+        {% if unscheduled_selected_count > 0 %}
+        <form method="post" action="{% url 'run_autonomous_loop_now' pk=company.pk %}" class="mb-4">
+            {% csrf_token %}
+            <button type="submit"
+                class="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+                aria-label="Schedule {{ unscheduled_selected_count }} selected action{{ unscheduled_selected_count|pluralize }} on the calendar">
+                Schedule selected ({{ unscheduled_selected_count }})
+            </button>
+        </form>
+        {% endif %}
         <div class="space-y-4">
             {% for action in actions %}
             <div class="p-4 rounded-lg border {% if action.status == 'SELECTED' %}border-green-300 bg-green-50{% elif action.status == 'REJECTED' %}border-slate-200 bg-slate-50{% else %}border-slate-200 bg-white{% endif %}">

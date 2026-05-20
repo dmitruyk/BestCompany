@@ -27,7 +27,7 @@
         </div>
     </div>
     <div class="flex gap-2 flex-wrap">
-        {% if idea.status == 'SUCCEEDED' and idea.development_status == 'NOT_STARTED' %}
+        {% if idea.status == 'SUCCEEDED' and idea.development_status == 'NOT_STARTED' and can_create_companies %}
         <form method="post" action="{% url 'accept_idea' pk=idea.pk %}" class="inline">
             {% csrf_token %}
             <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700" aria-label="Start Developing - Generate agent fleet">

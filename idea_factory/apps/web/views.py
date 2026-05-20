@@ -1,9 +1,11 @@
 """Views for idea_factory web UI."""
 import json
+import logging
 import os
 import subprocess
 import sys
 from typing import Optional
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -12,9 +14,18 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from django.utils.dateparse import parse_date
 
+from apps.core.access import (
+    companies_queryset_for_user,
+    get_company_for_user,
+    get_idea_for_user,
+    ideas_queryset_for_user,
+    user_can_create_companies,
+    user_can_create_ideas,
+)
 from apps.ideas.attachments import save_idea_attachments
 from apps.ideas.best_practices import assess_company_readiness
 from apps.ideas.context import build_idea_request_prompt
+from apps.ideas.autonomous_loop import count_unscheduled_selected, process_company
 from apps.ideas.development_plan import get_development_plan_summary
 from apps.ideas.models import (
     ActionProposal,
@@ -26,6 +37,8 @@ from apps.ideas.models import (
     IdeaConclusion,
     IdeaRequest,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # Ollama models that support tools (required for structured output).
@@ -73,7 +86,7 @@ def home(request: HttpRequest) -> HttpResponse:
     """List all idea requests."""
     from apps.agents.llm_settings import get_service_llm_settings
 
-    requests = IdeaRequest.objects.all()[:50]
+    requests = ideas_queryset_for_user(request.user)[:50]
     return render(
         request,
         "web/home.html",
@@ -89,6 +102,9 @@ def home(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET", "POST"])
 def new_idea(request: HttpRequest) -> HttpResponse:
     """Create new idea request form and handle run now."""
+    if not user_can_create_ideas(request.user):
+        messages.error(request, "You do not have permission to create idea requests.")
+        return redirect("home")
     if request.method == "POST":
         title = request.POST.get("title", "").strip() or "Untitled"
         prompt = request.POST.get("prompt", "").strip()
@@ -161,7 +177,7 @@ def _build_result_bundle(idea: IdeaRequest) -> dict:
 @require_http_methods(["GET"])
 def idea_detail(request: HttpRequest, pk: str) -> HttpResponse:
     """Detail page for idea request with agent runs."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     runs = idea.agent_runs.all()
     conclusion = getattr(idea, "conclusion", None)
     result_bundle = _build_result_bundle(idea)
@@ -190,7 +206,7 @@ def idea_detail(request: HttpRequest, pk: str) -> HttpResponse:
 @require_POST
 def add_idea_attachment(request: HttpRequest, pk: str) -> HttpResponse:
     """Upload additional PDF context documents to an existing idea."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     if idea.status == IdeaRequest.Status.RUNNING:
         return redirect("idea_detail", pk=pk)
     uploads = request.FILES.getlist("pdf_documents")
@@ -275,7 +291,7 @@ def _spawn_regenerate_agents_process(company_pk: str) -> None:
 @require_POST
 def stop_pipeline(request: HttpRequest, pk: str) -> HttpResponse:
     """Stop a running pipeline. Sets status to CANCELLED so the pipeline process exits at next check."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     if idea.status == IdeaRequest.Status.RUNNING:
         idea.status = IdeaRequest.Status.CANCELLED
         idea.save(update_fields=["status", "updated_at"])
@@ -286,7 +302,7 @@ def stop_pipeline(request: HttpRequest, pk: str) -> HttpResponse:
 @require_POST
 def rerun_failed_steps(request: HttpRequest, pk: str) -> HttpResponse:
     """Rerun failed pipeline steps for idea request (async)."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     _spawn_rerun_process(str(idea.pk))
     return redirect("idea_detail", pk=pk)
 
@@ -295,7 +311,7 @@ def rerun_failed_steps(request: HttpRequest, pk: str) -> HttpResponse:
 @require_POST
 def rerun_from_scratch(request: HttpRequest, pk: str) -> HttpResponse:
     """Delete all runs and rerun pipeline from scratch (async)."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     if idea.status == IdeaRequest.Status.RUNNING:
         return redirect("idea_detail", pk=pk)
     _spawn_rerun_from_scratch_process(str(idea.pk))
@@ -306,7 +322,10 @@ def rerun_from_scratch(request: HttpRequest, pk: str) -> HttpResponse:
 @require_POST
 def accept_idea(request: HttpRequest, pk: str) -> HttpResponse:
     """Accept idea and start development - spawns fleet generation."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
+    if not user_can_create_companies(request.user):
+        messages.error(request, "You do not have permission to create companies.")
+        return redirect("idea_detail", pk=pk)
     if idea.status != IdeaRequest.Status.SUCCEEDED:
         return redirect("idea_detail", pk=pk)
     if idea.development_status == IdeaRequest.DevelopmentStatus.GENERATING_FLEET:
@@ -326,7 +345,7 @@ def accept_idea(request: HttpRequest, pk: str) -> HttpResponse:
 @require_http_methods(["GET"])
 def delete_idea_confirm(request: HttpRequest, pk: str) -> HttpResponse:
     """Confirmation page before deleting an idea request."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     return render(request, "web/delete_confirm.html", {"idea": idea})
 
 
@@ -334,7 +353,7 @@ def delete_idea_confirm(request: HttpRequest, pk: str) -> HttpResponse:
 @require_POST
 def delete_idea(request: HttpRequest, pk: str) -> HttpResponse:
     """Delete an idea request and all related data."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     idea.delete()
     return redirect("home")
 
@@ -343,7 +362,7 @@ def delete_idea(request: HttpRequest, pk: str) -> HttpResponse:
 @require_POST
 def save_conclusion(request: HttpRequest, pk: str) -> HttpResponse:
     """Save or update IdeaConclusion for idea request."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     summary = request.POST.get("final_summary", "").strip()
     result_json = request.POST.get("result_json", "{}")
     if not summary:
@@ -383,7 +402,7 @@ PRIMARY_ROLES = {
 @require_http_methods(["GET"])
 def idea_status(request: HttpRequest, pk: str) -> JsonResponse:
     """JSON status for polling - returns status, run count, current/next step."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     runs = idea.agent_runs.all().order_by("started_at")
     runs_count = runs.count()
     last_run = runs.last()
@@ -412,7 +431,7 @@ def idea_status(request: HttpRequest, pk: str) -> JsonResponse:
 @require_http_methods(["GET"])
 def company_list(request: HttpRequest) -> HttpResponse:
     """List user's companies (from accepted ideas)."""
-    companies = Company.objects.filter(owner=request.user)[:50]
+    companies = companies_queryset_for_user(request.user)[:50]
     return render(request, "web/company_list.html", {"companies": companies})
 
 
@@ -420,12 +439,13 @@ def company_list(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET"])
 def company_detail(request: HttpRequest, pk: str) -> HttpResponse:
     """Company detail: agents, humans, discussions, readiness checks."""
-    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    company = get_company_for_user(request.user, pk)
     agents = company.agents.all()
     discussions = company.discussions.all()[:10]
     team_members = company.team_members.filter(is_active=True)
     readiness = assess_company_readiness(company)
     dev_plan = get_development_plan_summary(company.idea_request)
+    unscheduled_selected_count = count_unscheduled_selected(company)
     return render(
         request,
         "web/company_detail.html",
@@ -437,6 +457,7 @@ def company_detail(request: HttpRequest, pk: str) -> HttpResponse:
             "readiness": readiness,
             "dev_plan": dev_plan,
             "human_roles": CompanyTeamMember.Role.choices,
+            "unscheduled_selected_count": unscheduled_selected_count,
         },
     )
 
@@ -445,7 +466,7 @@ def company_detail(request: HttpRequest, pk: str) -> HttpResponse:
 @require_POST
 def add_team_member(request: HttpRequest, pk: str) -> HttpResponse:
     """Add a human team member to the company."""
-    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    company = get_company_for_user(request.user, pk)
     name = request.POST.get("name", "").strip()
     role = request.POST.get("role", CompanyTeamMember.Role.OTHER)
     email = request.POST.get("email", "").strip()
@@ -461,9 +482,49 @@ def add_team_member(request: HttpRequest, pk: str) -> HttpResponse:
 
 @login_required
 @require_POST
+def run_autonomous_loop_now(request: HttpRequest, pk: str) -> HttpResponse:
+    """Manually run schedule/execute loop when selected actions are not on the calendar yet."""
+    company = get_company_for_user(request.user, pk)
+    if company.status != Company.Status.ACTIVE:
+        messages.error(request, "Company must be active to run the autonomous loop.")
+        return redirect("company_detail", pk=pk)
+    pending = count_unscheduled_selected(company)
+    if pending == 0:
+        messages.warning(request, "No selected actions waiting to be scheduled.")
+        return redirect("company_detail", pk=pk)
+    schedule_only = not company.autonomous_mode
+    try:
+        result = process_company(company, schedule_and_execute_only=schedule_only)
+    except Exception:
+        logger.exception("Manual autonomous loop failed for company %s", company.pk)
+        messages.error(
+            request,
+            "Autonomous loop failed. Check LLM settings and server logs.",
+        )
+        return redirect("company_detail", pk=pk)
+    parts: list[str] = []
+    if result.actions_scheduled:
+        parts.append(f"Scheduled {result.actions_scheduled} action(s) on the calendar.")
+    if result.actions_executed:
+        parts.append(f"Executed {result.actions_executed} action(s) due today.")
+    if result.improvement_discussion_started:
+        parts.append("Started a follow-up director discussion.")
+    if result.next_steps_discussion_started:
+        parts.append('Started a new "Next steps" discussion.')
+    if not parts:
+        parts.append(
+            "Loop finished but no calendar entries were added. "
+            "Verify OpenAI/Ollama settings under LLM Settings."
+        )
+    messages.success(request, " ".join(parts))
+    return redirect("company_detail", pk=pk)
+
+
+@login_required
+@require_POST
 def toggle_autonomous_mode(request: HttpRequest, pk: str) -> HttpResponse:
     """Toggle autonomous mode - agents select, schedule, execute without user action."""
-    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    company = get_company_for_user(request.user, pk)
     company.autonomous_mode = not company.autonomous_mode
     company.save(update_fields=["autonomous_mode", "updated_at"])
     return redirect("company_detail", pk=pk)
@@ -473,7 +534,7 @@ def toggle_autonomous_mode(request: HttpRequest, pk: str) -> HttpResponse:
 @require_POST
 def regenerate_agents(request: HttpRequest, pk: str) -> HttpResponse:
     """Regenerate agent fleet based on current company state."""
-    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    company = get_company_for_user(request.user, pk)
     if company.status == Company.Status.REGENERATING_AGENTS:
         return redirect("company_detail", pk=pk)
     _spawn_regenerate_agents_process(str(company.pk))
@@ -486,7 +547,7 @@ def regenerate_agents(request: HttpRequest, pk: str) -> HttpResponse:
 @require_http_methods(["GET"])
 def company_status(request: HttpRequest, pk: str) -> JsonResponse:
     """JSON status for company polling (e.g. when regenerating agents)."""
-    company = get_object_or_404(Company, pk=pk, owner=request.user)
+    company = get_company_for_user(request.user, pk)
     return JsonResponse({"status": company.status})
 
 
@@ -494,7 +555,7 @@ def company_status(request: HttpRequest, pk: str) -> JsonResponse:
 @require_http_methods(["GET"])
 def company_agent_chat(request: HttpRequest, company_pk: str, agent_pk: str) -> HttpResponse:
     """Chat with a company agent."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     agent = get_object_or_404(CompanyAgent, pk=agent_pk, company=company)
     messages = agent.user_messages.all().order_by("created_at")[:50]
     return render(
@@ -508,7 +569,7 @@ def company_agent_chat(request: HttpRequest, company_pk: str, agent_pk: str) -> 
 @require_POST
 def agent_chat_send(request: HttpRequest, company_pk: str, agent_pk: str) -> HttpResponse:
     """Send message to agent and get response."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     agent = get_object_or_404(CompanyAgent, pk=agent_pk, company=company)
     user_content = request.POST.get("content", "").strip()
     if not user_content:
@@ -603,7 +664,7 @@ def _get_provider_model_for_idea(idea: IdeaRequest):
 @require_POST
 def rerun_discussion(request: HttpRequest, company_pk: str, discussion_pk: str) -> HttpResponse:
     """Re-run a director discussion - interrupt if running, clear messages/actions, spawn fresh."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     from apps.ideas.models import ActionProposal, DirectorDiscussion, DiscussionMessage
 
     discussion = get_object_or_404(DirectorDiscussion, pk=discussion_pk, company=company)
@@ -626,7 +687,7 @@ def rerun_discussion(request: HttpRequest, company_pk: str, discussion_pk: str) 
 @require_http_methods(["GET"])
 def discussion_status(request: HttpRequest, company_pk: str, discussion_pk: str) -> JsonResponse:
     """JSON status for discussion polling - progress visible while ACTIVE."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     from apps.ideas.models import DirectorDiscussion
 
     discussion = get_object_or_404(DirectorDiscussion, pk=discussion_pk, company=company)
@@ -648,15 +709,21 @@ def discussion_status(request: HttpRequest, company_pk: str, discussion_pk: str)
 @require_http_methods(["GET"])
 def director_discussion_detail(request: HttpRequest, company_pk: str, discussion_pk: str) -> HttpResponse:
     """Director discussion with action proposals."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     from apps.ideas.models import DirectorDiscussion
 
     discussion = get_object_or_404(DirectorDiscussion, pk=discussion_pk, company=company)
     actions = discussion.actions.all()
+    unscheduled_selected_count = count_unscheduled_selected(company)
     return render(
         request,
         "web/discussion_detail.html",
-        {"company": company, "discussion": discussion, "actions": actions},
+        {
+            "company": company,
+            "discussion": discussion,
+            "actions": actions,
+            "unscheduled_selected_count": unscheduled_selected_count,
+        },
     )
 
 
@@ -664,7 +731,7 @@ def director_discussion_detail(request: HttpRequest, company_pk: str, discussion
 @require_POST
 def action_select(request: HttpRequest, company_pk: str, action_pk: str) -> HttpResponse:
     """Select an action proposal (user approves)."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     action = get_object_or_404(ActionProposal, pk=action_pk, discussion__company=company)
     action.status = ActionProposal.ActionStatus.SELECTED
     action.save(update_fields=["status"])
@@ -679,7 +746,7 @@ def action_select(request: HttpRequest, company_pk: str, action_pk: str) -> Http
 @require_http_methods(["GET", "POST"])
 def action_schedule(request: HttpRequest, company_pk: str, action_pk: str) -> HttpResponse:
     """Schedule a selected action for a calendar date."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     action = get_object_or_404(ActionProposal, pk=action_pk, discussion__company=company)
     if action.status != ActionProposal.ActionStatus.SELECTED:
         action.status = ActionProposal.ActionStatus.SELECTED
@@ -722,7 +789,7 @@ def action_schedule(request: HttpRequest, company_pk: str, action_pk: str) -> Ht
 @require_POST
 def action_reject(request: HttpRequest, company_pk: str, action_pk: str) -> HttpResponse:
     """Reject an action proposal."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     action = get_object_or_404(ActionProposal, pk=action_pk, discussion__company=company)
     action.status = ActionProposal.ActionStatus.REJECTED
     action.save(update_fields=["status"])
@@ -750,7 +817,7 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
     import calendar as cal_module
     from datetime import date
 
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     start_date = _company_start_date(company)
     default_year = start_date.year
     default_month = start_date.month
@@ -805,7 +872,7 @@ def company_calendar_date(
     """Actions for a specific date. Only valid from company creation date onward."""
     from datetime import date
 
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     start_date = _company_start_date(company)
     action_date = date(year, month, day)
     if action_date < start_date:
@@ -836,7 +903,7 @@ def company_calendar_date(
 @require_http_methods(["GET", "POST"])
 def calendar_action_add(request: HttpRequest, company_pk: str) -> HttpResponse:
     """Add a manual action to a date."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     if request.method == "POST":
         title = request.POST.get("title", "").strip()
         description = request.POST.get("description", "").strip()
@@ -873,7 +940,7 @@ def calendar_action_update_status(
     request: HttpRequest, company_pk: str, entry_pk: str
 ) -> HttpResponse:
     """Update status of a calendar action."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     entry = get_object_or_404(CompanyCalendarAction, pk=entry_pk, company=company)
     new_status = request.POST.get("status", "").strip()
     completion_notes = request.POST.get("completion_notes", "").strip()
@@ -895,7 +962,7 @@ def calendar_action_update_status(
 @require_http_methods(["GET", "POST"])
 def start_discussion(request: HttpRequest, company_pk: str) -> HttpResponse:
     """Start a new director discussion (spawns directors to propose actions in background)."""
-    company = get_object_or_404(Company, pk=company_pk, owner=request.user)
+    company = get_company_for_user(request.user, company_pk)
     from apps.ideas.models import DirectorDiscussion
 
     if request.method == "POST":
@@ -1008,7 +1075,7 @@ def _run_director_discussion(discussion) -> None:
 @require_http_methods(["GET"])
 def download_json(request: HttpRequest, pk: str) -> HttpResponse:
     """Download idea result as JSON file."""
-    idea = get_object_or_404(IdeaRequest, pk=pk)
+    idea = get_idea_for_user(request.user, pk)
     data = {
         "id": str(idea.pk),
         "title": idea.title,
