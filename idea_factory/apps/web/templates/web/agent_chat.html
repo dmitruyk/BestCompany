@@ -4,10 +4,12 @@
 {% block title %}Chat with {{ agent.name }} - {{ company.name }}{% endblock %}
 
 {% block content %}
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+
 <div class="mb-4">
-    <a href="{% url 'company_detail' pk=company.pk %}" class="link-back">← {{ company.name }}</a>
-    <h1 class="text-xl font-bold text-slate-900 mt-1">Chat with {{ agent.name }}</h1>
-    <p class="text-sm text-slate-600">{{ agent.get_role_display }}</p>
+    <h2 class="text-xl font-bold text-slate-900">Chat with {{ agent.name }}</h2>
+    <p class="text-sm text-slate-600">{{ agent.get_role_display }} · <a href="{% url 'company_detail' pk=company.pk %}" class="text-indigo-600 hover:underline">Back to overview</a></p>
 </div>
 
 {% agent_chat_examples agent as chat_examples %}

@@ -83,6 +83,11 @@ urlpatterns = [
     path("companies/<uuid:company_pk>/calendar/entry/<uuid:entry_pk>/status/", views.calendar_action_update_status, name="calendar_action_update_status"),
     path("companies/<uuid:company_pk>/tasks/", company_planning_views.company_tasks, name="company_tasks"),
     path(
+        "companies/<uuid:company_pk>/tasks/run/",
+        company_planning_views.company_tasks_run_now,
+        name="company_tasks_run_now",
+    ),
+    path(
         "companies/<uuid:company_pk>/tasks/<uuid:task_pk>/",
         company_planning_views.company_task_detail,
         name="company_task_detail",

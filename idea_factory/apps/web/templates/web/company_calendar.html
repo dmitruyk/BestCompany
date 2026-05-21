@@ -7,10 +7,17 @@
 {% guide_hint title="How to use the calendar" body="Tap or click a day to see scheduled actions. Use + Add Action for manual tasks. Colored chips show status: planned (amber), in progress (blue), done (green). Today is highlighted with a ring. Selected director actions appear here after you schedule them." %}
 {% guide_hint title="Google Calendar sync" body="Open Google Calendar in the top menu to connect your account. Scheduled actions sync as all-day events with reminders (for example 1 hour and 1 day before)." %}
 
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+{% if counts.calendar_overdue > 0 %}
+<p class="mb-4 text-sm font-medium text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2" role="alert">
+    {{ counts.calendar_overdue }} overdue action{{ counts.calendar_overdue|pluralize }} — open the day view and update status or defer.
+</p>
+{% endif %}
+
 <header class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
     <div class="min-w-0">
-        <a href="{% url 'company_detail' pk=company.pk %}" class="link-back">← {{ company.name }}</a>
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 mt-1">Calendar</h1>
+        <h2 class="text-lg font-semibold text-slate-900">Calendar</h2>
         <p class="mt-1 text-sm text-slate-600">
             <time datetime="{{ today|date:'Y-m-d' }}">Today: {{ today|date:"l, F j, Y" }}</time>
         </p>

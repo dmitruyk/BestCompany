@@ -6,105 +6,136 @@
 {% block content %}
 {% if company.autonomous_mode %}
 {% company_steps_autonomous as steps_auto %}
-{% guide_hint title="Self-Run mode" body="Agents can select director actions, schedule them on the calendar, and run tasks due today. You can still chat with any agent or start discussions to steer direction." steps=steps_auto %}
+{% guide_hint title="Self-Run mode" body="Agents can select director actions, schedule them on the calendar, and run tasks due today. Use the tabs below to steer strategy, review KPIs, and intervene anytime." steps=steps_auto %}
 {% else %}
 {% company_steps_manual as steps_manual %}
-{% guide_hint title="Manual mode — what you can do here" body="You are the owner: chat with agents for advice, start director discussions for proposed actions, select which actions to implement, then schedule them on the calendar." steps=steps_manual %}
+{% guide_hint title="Manual mode — lead your company" body="You are the owner. Use Overview for KPIs and readiness, Tasks to run agent work, Planning for weekly scope, and Discussions to approve director actions." steps=steps_manual %}
 {% endif %}
 
-<div class="mb-6">
-    <div class="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-start">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-900">{{ company.name }}</h1>
-            <p class="mt-1 text-slate-600">Based on idea: {{ company.idea_request.title }}</p>
-            <span class="inline-flex mt-2 px-2 py-1 text-xs font-medium rounded-full
-                {% if company.status == 'REGENERATING_AGENTS' %}bg-blue-100 text-blue-800
-                {% elif company.status == 'ACTIVE' %}bg-green-100 text-green-800
-                {% else %}bg-slate-100 text-slate-800{% endif %}">
-                {{ company.get_status_display }}
-            </span>
-        </div>
-        <div class="flex flex-wrap gap-2 items-center">
-            {% if company.status != 'REGENERATING_AGENTS' %}
-            <form method="post" action="{% url 'toggle_autonomous_mode' pk=company.pk %}" class="inline">
-                {% csrf_token %}
-                <button type="submit"
-                    class="inline-flex px-4 py-2 rounded-lg text-sm font-medium {% if company.autonomous_mode %}bg-emerald-100 text-emerald-800 border border-emerald-300{% else %}bg-slate-100 text-slate-700 border border-slate-300{% endif %} hover:opacity-90"
-                    aria-label="Toggle autonomous mode"
-                    title="{% if company.autonomous_mode %}Autonomous: agents select, schedule, execute. Click to switch to manual.{% else %}Manual: you select and approve. Click to switch to autonomous.{% endif %}">
-                    {% if company.autonomous_mode %}🤖 Self-Run{% else %}👤 Manual{% endif %}
-                </button>
-            </form>
-            <form method="post" action="{% url 'regenerate_agents' pk=company.pk %}" class="inline">
-                {% csrf_token %}
-                <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg border border-amber-300 text-amber-800 text-sm font-medium hover:bg-amber-50" aria-label="Regenerate agents">
-                    Regenerate Agents
-                </button>
-            </form>
-            {% endif %}
-            <a href="{% url 'company_tasks' company_pk=company.pk %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                Tasks{% if open_task_count %} ({{ open_task_count }}){% endif %}
-            </a>
-            <a href="{% url 'company_planning' company_pk=company.pk %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-indigo-300 text-indigo-800 text-sm font-medium hover:bg-indigo-50">
-                Planning
-            </a>
-            <a href="{% url 'company_calendar' company_pk=company.pk %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                Calendar
-            </a>
-            <a href="{% url 'company_history' company_pk=company.pk %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                History
-            </a>
-            <a href="{% url 'company_list' %}" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                ← All Companies
-            </a>
-        </div>
-    </div>
-</div>
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+{% include "web/includes/company_attention.html" %}
+{% include "web/includes/company_metrics.html" %}
 
 {% if company.status == 'REGENERATING_AGENTS' %}
-<p class="mb-4 text-sm text-blue-600">Regenerating agent fleet based on current company state… Page refreshes when done.</p>
+<p class="mb-4 text-sm text-blue-600" role="status">Regenerating agent fleet… This page refreshes when complete.</p>
 {% endif %}
 
-<div class="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-    <div class="flex flex-wrap justify-between items-start gap-4 mb-4">
-        <div>
-            <h2 class="text-lg font-semibold text-slate-900">Progress & direction</h2>
-            <p class="text-sm text-slate-600 mt-1">
-                {% if progress.total_tasks %}
-                {{ progress.done_count }}/{{ progress.active_tasks }} tasks done · weighted progress {{ progress.weighted_progress_percent }}%
-                {% else %}
-                No tasks yet — <a href="{% url 'company_planning' company_pk=company.pk %}" class="text-indigo-600 hover:underline">run planning</a> to create scope.
-                {% endif %}
-            </p>
-            {% if direction %}
-            <p class="text-sm text-slate-600 mt-2">
-                Direction: {{ direction.statement|truncatewords:30 }}
-                {% if direction.founder_verified %}<span class="text-emerald-700 font-medium">(founder-verified)</span>{% else %}<span class="text-amber-700">(draft)</span>{% endif %}
-                · <a href="{% url 'company_direction' company_pk=company.pk %}" class="text-indigo-600 hover:underline">edit</a>
-            </p>
+{% if executive_summary %}
+<div class="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+    <h2 class="text-sm font-semibold text-slate-800">Executive summary (pipeline)</h2>
+    <p class="mt-1 text-sm text-slate-700 leading-relaxed">{{ executive_summary|truncatewords:80 }}</p>
+</div>
+{% endif %}
+
+<section class="mb-6" aria-label="Success metrics and KPIs">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-3">
+        <h2 class="text-lg font-semibold text-slate-900">KPIs & success metrics</h2>
+        <a href="{% url 'company_direction' company_pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">Align direction →</a>
+    </div>
+    <div class="grid gap-4 lg:grid-cols-2">
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+            <h3 class="text-sm font-semibold text-slate-800 mb-2">Pipeline KPIs</h3>
+            {% if dev_plan.kpis %}
+            <ul class="space-y-2" role="list">
+                {% for k in dev_plan.kpis %}
+                <li class="flex gap-2 text-sm text-slate-700 p-2 rounded-lg bg-indigo-50/50 border border-indigo-100">
+                    <span class="text-indigo-600 shrink-0" aria-hidden="true">◆</span>
+                    <span>{{ k }}</span>
+                </li>
+                {% endfor %}
+            </ul>
             {% else %}
-            <p class="text-sm text-amber-700 mt-2">
-                Set strategic direction with founders before planning —
-                <a href="{% url 'company_direction' company_pk=company.pk %}" class="underline">define direction</a>
+            <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                No KPIs from the idea pipeline yet. Re-run the idea analysis or ask the CPA / Product agent to define measurable success metrics.
             </p>
             {% endif %}
         </div>
-        <a href="{% url 'company_planning' company_pk=company.pk %}" class="btn-primary shrink-0">Start planning</a>
-    </div>
-</div>
-
-<div class="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-    <div class="flex flex-wrap justify-between items-start gap-4 mb-4">
-        <div>
-            <h2 class="text-lg font-semibold text-slate-900">Company readiness</h2>
-            <p class="text-sm text-slate-500 mt-1">Phase: <span class="font-medium text-slate-700">{{ readiness.phase }}</span> · Score: {{ readiness.score_percent }}% ({{ readiness.pass_count }} pass, {{ readiness.warn_count }} warn, {{ readiness.fail_count }} fail)</p>
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+            <h3 class="text-sm font-semibold text-slate-800 mb-2">Milestones & backlog</h3>
+            {% if dev_plan.milestones %}
+            <p class="text-xs font-medium text-slate-500 uppercase mb-1">Milestones</p>
+            <ul class="text-sm text-slate-600 list-disc list-inside mb-3 space-y-0.5">
+                {% for m in dev_plan.milestones %}
+                <li>{{ m }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% if dev_plan.mvp_backlog %}
+            <p class="text-xs font-medium text-slate-500 uppercase mb-1">MVP backlog</p>
+            <ul class="text-sm text-slate-600 list-disc list-inside space-y-0.5">
+                {% for item in dev_plan.mvp_backlog|slice:":8" %}
+                <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+            {% elif not dev_plan.milestones %}
+            <p class="text-sm text-slate-500">No development plan artifacts yet — <a href="{% url 'company_planning' company_pk=company.pk %}" class="text-indigo-600 hover:underline">start planning</a>.</p>
+            {% endif %}
         </div>
     </div>
+</section>
+
+<section class="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6" aria-label="Strategic direction">
+    <div class="flex flex-wrap justify-between items-start gap-4">
+        <div class="min-w-0 flex-1">
+            <h2 class="text-lg font-semibold text-slate-900">Strategic direction</h2>
+            {% if direction %}
+            <p class="text-sm text-slate-700 mt-2 leading-relaxed">{{ direction.statement }}</p>
+            <p class="text-sm mt-2">
+                {% if direction.founder_verified %}
+                <span class="text-emerald-700 font-medium">Founder-verified</span>
+                {% else %}
+                <span class="text-amber-700 font-medium">Draft — verify with founders</span>
+                {% endif %}
+            </p>
+            {% else %}
+            <p class="text-sm text-amber-700 mt-2">No direction set. Define it before planning so tasks align with your goals.</p>
+            {% endif %}
+        </div>
+        <a href="{% url 'company_direction' company_pk=company.pk %}" class="btn-secondary shrink-0">Edit direction</a>
+    </div>
+</section>
+
+<section class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Quick actions">
+    <a href="{% url 'company_tasks' company_pk=company.pk %}"
+        class="group p-4 rounded-xl border border-slate-200 bg-white shadow-sm hover:border-indigo-300 hover:shadow-md transition-shadow">
+        <span class="text-lg" aria-hidden="true">✓</span>
+        <p class="mt-2 font-semibold text-slate-900 group-hover:text-indigo-700">Task board</p>
+        <p class="text-sm text-slate-600 mt-1">{{ counts.open_tasks }} open{% if counts.runnable_tasks %} · {{ counts.runnable_tasks }} ready to run{% endif %}</p>
+    </a>
+    <a href="{% url 'company_planning' company_pk=company.pk %}"
+        class="group p-4 rounded-xl border border-slate-200 bg-white shadow-sm hover:border-indigo-300 hover:shadow-md transition-shadow">
+        <span class="text-lg" aria-hidden="true">📋</span>
+        <p class="mt-2 font-semibold text-slate-900 group-hover:text-indigo-700">Planning</p>
+        <p class="text-sm text-slate-600 mt-1">Weekly scope & agent assignments</p>
+    </a>
+    <a href="{% url 'company_calendar' company_pk=company.pk %}"
+        class="group p-4 rounded-xl border border-slate-200 bg-white shadow-sm hover:border-indigo-300 hover:shadow-md transition-shadow">
+        <span class="text-lg" aria-hidden="true">📅</span>
+        <p class="mt-2 font-semibold text-slate-900 group-hover:text-indigo-700">Calendar</p>
+        <p class="text-sm text-slate-600 mt-1">
+            {% if counts.calendar_overdue %}{{ counts.calendar_overdue }} overdue{% elif counts.calendar_today %}{{ counts.calendar_today }} due today{% else %}{{ counts.calendar_open }} scheduled{% endif %}
+        </p>
+    </a>
+    <a href="{% url 'company_history' company_pk=company.pk %}"
+        class="group p-4 rounded-xl border border-slate-200 bg-white shadow-sm hover:border-indigo-300 hover:shadow-md transition-shadow">
+        <span class="text-lg" aria-hidden="true">📜</span>
+        <p class="mt-2 font-semibold text-slate-900 group-hover:text-indigo-700">History</p>
+        <p class="text-sm text-slate-600 mt-1">Direction, planning, task audit log</p>
+    </a>
+</section>
+
+<div id="readiness" class="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-1">Company readiness</h2>
+    <p class="text-sm text-slate-500 mb-4">Best-practice checks with owners — use failures as your control checklist.</p>
     <ul class="grid gap-2 sm:grid-cols-2">
         {% for check in readiness.checks %}
-        <li class="flex gap-2 text-sm p-2 rounded-lg bg-slate-50 border border-slate-100">
+        <li class="flex gap-2 text-sm p-3 rounded-lg border
+            {% if check.status == 'fail' %}bg-red-50/50 border-red-100
+            {% elif check.status == 'warn' %}bg-amber-50/50 border-amber-100
+            {% else %}bg-slate-50 border-slate-100{% endif %}">
             <span aria-hidden="true">{{ check.icon }}</span>
-            <div>
+            <div class="min-w-0">
                 <span class="font-medium text-slate-800">{{ check.label }}</span>
                 <p class="text-slate-600">{{ check.message }}</p>
                 {% if check.owner_hint %}<p class="text-xs text-slate-500 mt-0.5">Owner: {{ check.owner_hint }}</p>{% endif %}
@@ -112,88 +143,67 @@
         </li>
         {% endfor %}
     </ul>
-    {% if dev_plan.has_plan %}
-    <div class="mt-4 pt-4 border-t border-slate-200">
-        <h3 class="text-sm font-semibold text-slate-800 mb-2">Development plan (from idea pipeline)</h3>
-        {% if dev_plan.go_no_go %}<p class="text-sm text-slate-600 mb-2"><span class="font-medium">Go/no-go:</span> {{ dev_plan.go_no_go }}</p>{% endif %}
-        {% if dev_plan.milestones %}
-        <p class="text-xs font-medium text-slate-500 uppercase mb-1">Milestones</p>
-        <ul class="text-sm text-slate-600 list-disc list-inside mb-2">
-            {% for m in dev_plan.milestones|slice:":5" %}<li>{{ m }}</li>{% endfor %}
-        </ul>
-        {% endif %}
-        {% if dev_plan.kpis %}
-        <p class="text-xs font-medium text-slate-500 uppercase mb-1">KPIs</p>
-        <ul class="text-sm text-slate-600 list-disc list-inside">
-            {% for k in dev_plan.kpis|slice:":5" %}<li>{{ k }}</li>{% endfor %}
-        </ul>
-        {% endif %}
-    </div>
-    {% endif %}
 </div>
 
 <div class="grid gap-6 lg:grid-cols-2">
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-2">Agent Fleet</h2>
-        <p class="text-sm text-slate-600 mb-4">Click <strong>Ask</strong> to chat with a specialist. Ask about status, risks, priorities, or drafts — you make the final decisions.</p>
-        <div class="space-y-3">
+        <h2 class="text-lg font-semibold text-slate-900 mb-2">Agent fleet</h2>
+        <p class="text-sm text-slate-600 mb-4">Chat with specialists for advice on status, risks, budgets, and priorities. You make final decisions.</p>
+        <div class="space-y-2 max-h-80 overflow-y-auto">
             {% for agent in agents %}
             <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
-                <div>
+                <div class="min-w-0">
                     <span class="font-medium text-slate-900">{{ agent.name }}</span>
-                    <span class="text-sm text-slate-500 ml-2">({{ agent.get_role_display }})</span>
+                    <span class="text-sm text-slate-500 ml-1">({{ agent.get_role_display }})</span>
                 </div>
                 <a href="{% url 'company_agent_chat' company_pk=company.pk agent_pk=agent.pk %}"
-                    class="inline-flex items-center px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
+                    class="shrink-0 inline-flex px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
                     aria-label="Chat with {{ agent.name }}">
                     Ask
                 </a>
             </div>
             {% empty %}
-            <p class="text-slate-500">No agents yet. Fleet may still be generating.</p>
+            <p class="text-slate-500 text-sm">No agents yet. Fleet may still be generating.</p>
             {% endfor %}
         </div>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-2">Director Discussions</h2>
-        <p class="text-sm text-slate-600 mb-2">Start a topic; directors debate and propose concrete actions.</p>
-        <p class="text-xs text-slate-500 mb-4">{% if company.autonomous_mode %}Self-Run: agents may auto-select actions.{% else %}You review each proposal and click Select or Reject, then Schedule selected.{% endif %} Example topics: “Next steps”, “Marketing launch”, “Budget review”.</p>
-        {% if unscheduled_selected_count > 0 %}
-        <form method="post" action="{% url 'run_autonomous_loop_now' pk=company.pk %}" class="mb-4">
-            {% csrf_token %}
-            <button type="submit"
-                class="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
-                aria-label="Schedule {{ unscheduled_selected_count }} selected action{{ unscheduled_selected_count|pluralize }} on the calendar">
-                Schedule selected ({{ unscheduled_selected_count }})
-            </button>
-            <p class="text-xs text-slate-500 mt-2 max-w-xl">
-                {% if company.autonomous_mode %}Runs the self-run loop:{% else %}Schedules your selected actions and{% endif %}
-                adds them to the calendar and runs any items due today.
-            </p>
-        </form>
+    <div id="discussions" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div class="flex flex-wrap justify-between items-start gap-2 mb-2">
+            <h2 class="text-lg font-semibold text-slate-900">Director discussions</h2>
+            <a href="{% url 'start_discussion' company_pk=company.pk %}" class="btn-primary text-sm">Start discussion</a>
+        </div>
+        <p class="text-sm text-slate-600 mb-4">
+            {% if company.autonomous_mode %}Self-Run may auto-select actions — review proposals and the calendar regularly.{% else %}Select actions you agree with, then schedule them on the calendar.{% endif %}
+        </p>
+        {% if counts.awaiting_selection > 0 %}
+        <p class="mb-3 text-sm font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            {{ counts.awaiting_selection }} discussion{{ counts.awaiting_selection|pluralize }} waiting for your selection.
+        </p>
         {% endif %}
-        <a href="{% url 'start_discussion' company_pk=company.pk %}"
-            class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 mb-4">
-            Start New Discussion
-        </a>
-        <div class="space-y-3">
+        <div class="space-y-2 max-h-72 overflow-y-auto">
             {% for discussion in discussions %}
-            <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100">
+            <div class="flex items-center justify-between gap-2 p-3 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100">
                 <a href="{% url 'director_discussion_detail' company_pk=company.pk discussion_pk=discussion.pk %}" class="flex-1 min-w-0">
-                    <span class="font-medium text-slate-900">{{ discussion.topic }}</span>
-                    <span class="text-sm text-slate-500 ml-2">({{ discussion.get_status_display }})</span>
-                    <span class="text-sm text-slate-500 block mt-1">{{ discussion.created_at|date:"M d, H:i" }}</span>
+                    <span class="font-medium text-slate-900 block truncate">{{ discussion.topic }}</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full inline-block mt-1
+                        {% if discussion.status == 'AWAITING_SELECTION' %}bg-amber-100 text-amber-800
+                        {% elif discussion.status == 'COMPLETED' %}bg-green-100 text-green-800
+                        {% elif discussion.status == 'FAILED' %}bg-red-100 text-red-800
+                        {% else %}bg-blue-100 text-blue-800{% endif %}">
+                        {{ discussion.get_status_display }}
+                    </span>
+                    <span class="text-xs text-slate-500 block mt-1">{{ discussion.created_at|date:"M d, H:i" }}</span>
                 </a>
-                <form method="post" action="{% url 'rerun_discussion' company_pk=company.pk discussion_pk=discussion.pk %}" class="ml-3">
+                <form method="post" action="{% url 'rerun_discussion' company_pk=company.pk discussion_pk=discussion.pk %}" class="shrink-0">
                     {% csrf_token %}
-                    <button type="submit" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium" aria-label="{% if discussion.status == 'ACTIVE' %}Interrupt and re-run{% else %}Re-run{% endif %} {{ discussion.topic }}">
-                        {% if discussion.status == 'ACTIVE' %}Interrupt & Re-run{% else %}Re-run{% endif %}
+                    <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap">
+                        {% if discussion.status == 'ACTIVE' %}Interrupt{% else %}Re-run{% endif %}
                     </button>
                 </form>
             </div>
             {% empty %}
-            <p class="text-slate-500">No discussions yet. Start one to get director recommendations.</p>
+            <p class="text-slate-500 text-sm">No discussions yet. Start one for director recommendations.</p>
             {% endfor %}
         </div>
     </div>
@@ -201,7 +211,7 @@
 
 <div class="mt-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
     <h2 class="text-lg font-semibold text-slate-900 mb-2">Human team</h2>
-    <p class="text-sm text-slate-500 mb-4">Founders, assistants, QA, marketing, and other humans alongside AI agents.</p>
+    <p class="text-sm text-slate-500 mb-4">Founders, assistants, QA, marketing alongside AI agents.</p>
     <ul class="space-y-2 mb-4">
         {% for member in team_members %}
         <li class="text-sm text-slate-700 p-2 rounded-lg bg-slate-50 border border-slate-100">
@@ -214,7 +224,7 @@
     </ul>
     <form method="post" action="{% url 'add_team_member' pk=company.pk %}" class="flex flex-wrap gap-3 items-end">
         {% csrf_token %}
-        <div>
+        <div class="min-w-[8rem] flex-1">
             <label for="member_name" class="block text-sm font-medium text-slate-700 mb-1">Name</label>
             <input type="text" name="name" id="member_name" required maxlength="120" class="form-control">
         </div>
@@ -226,11 +236,11 @@
                 {% endfor %}
             </select>
         </div>
-        <div>
+        <div class="min-w-[10rem] flex-1">
             <label for="member_email" class="block text-sm font-medium text-slate-700 mb-1">Email (optional)</label>
             <input type="email" name="email" id="member_email" class="form-control">
         </div>
-        <button type="submit" class="inline-flex px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Add member</button>
+        <button type="submit" class="btn-primary">Add member</button>
     </form>
 </div>
 
@@ -240,7 +250,7 @@
             aria-label="Toggle full original idea text">
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
-                    <h2 class="text-lg font-semibold text-slate-900">Original Idea</h2>
+                    <h2 class="text-lg font-semibold text-slate-900">Original idea</h2>
                     <p class="mt-1 text-sm font-medium text-slate-700">{{ company.idea_request.title }}</p>
                     <p class="mt-2 text-sm text-slate-500 whitespace-pre-wrap line-clamp-3 group-open:hidden">{{ company.idea_request.prompt }}</p>
                 </div>

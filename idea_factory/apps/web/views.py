@@ -23,11 +23,9 @@ from apps.core.access import (
     user_can_create_ideas,
 )
 from apps.ideas.attachments import save_idea_attachments
-from apps.ideas.best_practices import assess_company_readiness
 from apps.ideas.context import build_idea_request_prompt
 from apps.ideas.autonomous_loop import count_unscheduled_selected, process_company
-from apps.ideas.development_plan import get_development_plan_summary
-from apps.ideas.planning_context import compute_progress_metrics, get_active_direction
+from apps.web.company_workspace import build_company_workspace_context
 from apps.ideas.models import (
     ActionProposal,
     AgentRun,
@@ -440,36 +438,18 @@ def company_list(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_http_methods(["GET"])
 def company_detail(request: HttpRequest, pk: str) -> HttpResponse:
-    """Company detail: agents, humans, discussions, readiness checks."""
+    """Company detail: command center with KPIs, readiness, agents, discussions."""
     company = get_company_for_user(request.user, pk)
-    agents = company.agents.all()
-    discussions = company.discussions.all()[:10]
-    team_members = company.team_members.filter(is_active=True)
-    readiness = assess_company_readiness(company)
-    dev_plan = get_development_plan_summary(company.idea_request)
-    unscheduled_selected_count = count_unscheduled_selected(company)
-    progress = compute_progress_metrics(company)
-    direction = get_active_direction(company)
-    open_task_count = company.tasks.exclude(
-        status__in=[CompanyTask.Status.DONE, CompanyTask.Status.CANCELLED]
-    ).count()
-    return render(
-        request,
-        "web/company_detail.html",
+    ctx = build_company_workspace_context(company, active_tab="overview")
+    ctx.update(
         {
-            "company": company,
-            "agents": agents,
-            "discussions": discussions,
-            "team_members": team_members,
-            "readiness": readiness,
-            "dev_plan": dev_plan,
+            "agents": company.agents.all(),
+            "discussions": company.discussions.all()[:15],
+            "team_members": company.team_members.filter(is_active=True),
             "human_roles": CompanyTeamMember.Role.choices,
-            "unscheduled_selected_count": unscheduled_selected_count,
-            "progress": progress,
-            "direction": direction,
-            "open_task_count": open_task_count,
-        },
+        }
     )
+    return render(request, "web/company_detail.html", ctx)
 
 
 @login_required
@@ -569,16 +549,9 @@ def company_agent_chat(request: HttpRequest, company_pk: str, agent_pk: str) -> 
     agent = get_object_or_404(CompanyAgent, pk=agent_pk, company=company)
     messages = agent.user_messages.filter(user=request.user).order_by("created_at")[:50]
     chat_pending = _agent_has_pending_message(agent, request.user)
-    return render(
-        request,
-        "web/agent_chat.html",
-        {
-            "company": company,
-            "agent": agent,
-            "messages": messages,
-            "chat_pending": chat_pending,
-        },
-    )
+    ctx = build_company_workspace_context(company, active_tab="overview")
+    ctx.update({"agent": agent, "messages": messages, "chat_pending": chat_pending})
+    return render(request, "web/agent_chat.html", ctx)
 
 
 def _agent_has_pending_message(agent: CompanyAgent, user) -> bool:
@@ -801,17 +774,15 @@ def director_discussion_detail(request: HttpRequest, company_pk: str, discussion
 
     discussion = get_object_or_404(DirectorDiscussion, pk=discussion_pk, company=company)
     actions = discussion.actions.all()
-    unscheduled_selected_count = count_unscheduled_selected(company)
-    return render(
-        request,
-        "web/discussion_detail.html",
+    ctx = build_company_workspace_context(company, active_tab="discussions")
+    ctx.update(
         {
-            "company": company,
             "discussion": discussion,
             "actions": actions,
-            "unscheduled_selected_count": unscheduled_selected_count,
-        },
+            "unscheduled_selected_count": ctx["counts"]["unscheduled_selected"],
+        }
     )
+    return render(request, "web/discussion_detail.html", ctx)
 
 
 @login_required
@@ -937,11 +908,9 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
     next_year = year if month < 12 else year + 1
     is_current_month = year == today.year and month == today.month
     can_go_today = today >= start_date
-    return render(
-        request,
-        "web/company_calendar.html",
+    ctx = build_company_workspace_context(company, active_tab="calendar")
+    ctx.update(
         {
-            "company": company,
             "year": year,
             "month": month,
             "month_name": cal_module.month_name[month],
@@ -956,8 +925,9 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
             "next_year": next_year,
             "next_month": next_month,
             "has_prev": has_prev,
-        },
+        }
     )
+    return render(request, "web/company_calendar.html", ctx)
 
 
 @login_required
@@ -1075,7 +1045,8 @@ def start_discussion(request: HttpRequest, company_pk: str) -> HttpResponse:
             company_pk=company_pk,
             discussion_pk=str(discussion.pk),
         )
-    return render(request, "web/start_discussion.html", {"company": company})
+    ctx = build_company_workspace_context(company, active_tab="overview")
+    return render(request, "web/start_discussion.html", ctx)
 
 
 def _spawn_discussion_process(discussion_pk: str) -> None:

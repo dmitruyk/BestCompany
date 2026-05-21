@@ -1,0 +1,24 @@
+{% if attention_items %}
+<section class="mb-6" aria-label="Needs your attention">
+    <h2 class="text-sm font-semibold text-slate-800 mb-2">Needs your attention</h2>
+    <ul class="space-y-2">
+        {% for item in attention_items %}
+        <li>
+            <a href="{{ item.href }}"
+                class="flex gap-3 p-3 rounded-xl border text-sm transition-colors
+                {% if item.severity == 'high' %}border-red-200 bg-red-50 hover:bg-red-100/80
+                {% elif item.severity == 'medium' %}border-amber-200 bg-amber-50 hover:bg-amber-100/80
+                {% else %}border-slate-200 bg-white hover:bg-slate-50{% endif %}">
+                <span class="shrink-0 mt-0.5" aria-hidden="true">
+                    {% if item.severity == 'high' %}🔴{% elif item.severity == 'medium' %}🟡{% else %}🟢{% endif %}
+                </span>
+                <span class="min-w-0">
+                    <span class="font-medium text-slate-900 block">{{ item.label }}</span>
+                    <span class="text-slate-600">{{ item.detail }}</span>
+                </span>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}

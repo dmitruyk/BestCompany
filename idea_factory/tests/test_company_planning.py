@@ -85,6 +85,34 @@ def test_record_history(company):
 
 
 @pytest.mark.django_db
+def test_company_tasks_run_now(client, user, company, full_agent_fleet):
+    del full_agent_fleet
+    from unittest.mock import patch
+
+    from apps.ideas.models import CompanyAgent
+    from apps.ideas.task_execution import TaskExecutionResult
+
+    agent = company.agents.filter(role=CompanyAgent.Role.PLANNER).first()
+    CompanyTask.objects.create(
+        company=company,
+        title="Runnable",
+        status=CompanyTask.Status.TODO,
+        assignee_type=CompanyTask.AssigneeType.AGENT,
+        assigned_agent=agent,
+    )
+    client.force_login(user)
+    with patch(
+        "apps.web.company_planning_views.run_task_execution_for_company",
+        return_value=TaskExecutionResult(tasks_completed=1, tasks_started=1),
+    ):
+        resp = client.post(
+            reverse("company_tasks_run_now", kwargs={"company_pk": company.pk})
+        )
+    assert resp.status_code == 302
+    assert resp.url.endswith(f"/companies/{company.pk}/tasks/")
+
+
+@pytest.mark.django_db
 def test_company_tasks_view(client, user, company, full_agent_fleet):
     del full_agent_fleet
     client.force_login(user)

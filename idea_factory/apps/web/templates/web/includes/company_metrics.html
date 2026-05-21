@@ -1,0 +1,41 @@
+<section class="mb-6" aria-label="Company progress metrics">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">weighted_progress_percent</p>
+            <p class="text-[11px] text-slate-400">Overall progress (by task %)</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900 tabular-nums">{{ progress.weighted_progress_percent }}%</p>
+            <div class="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden" role="progressbar"
+                aria-valuenow="{{ progress.weighted_progress_percent }}" aria-valuemin="0" aria-valuemax="100"
+                aria-label="Weighted progress">
+                <div class="h-full bg-indigo-500 rounded-full transition-all" style="width: {{ progress.weighted_progress_percent }}%"></div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">completion_percent</p>
+            <p class="text-[11px] text-slate-400">Share of tasks fully done</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900 tabular-nums">{{ progress.completion_percent }}%</p>
+            <p class="mt-1 text-sm text-slate-600">
+                <span class="font-medium tabular-nums">{{ progress.done_count }}</span> / <span class="tabular-nums">{{ progress.active_tasks }}</span> tasks done
+            </p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Task pipeline</p>
+            <p class="text-[11px] text-slate-400">in_progress_count · blocked_count · runnable</p>
+            <ul class="mt-2 text-sm text-slate-700 space-y-0.5">
+                <li><span class="font-medium tabular-nums">{{ progress.in_progress_count }}</span> in progress</li>
+                <li><span class="font-medium tabular-nums">{{ progress.blocked_count }}</span> blocked</li>
+                <li><span class="font-medium tabular-nums">{{ counts.runnable_tasks }}</span> ready for agent run</li>
+            </ul>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Readiness</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900 tabular-nums">{{ readiness.score_percent }}%</p>
+            <p class="mt-1 text-sm text-slate-600">
+                Phase <span class="font-semibold">{{ readiness.phase }}</span>
+                · <span class="tabular-nums">{{ readiness.pass_count }}</span> pass
+                · <span class="tabular-nums text-amber-700">{{ readiness.warn_count }}</span> warn
+                · <span class="tabular-nums text-red-700">{{ readiness.fail_count }}</span> fail
+            </p>
+        </div>
+    </div>
+</section>

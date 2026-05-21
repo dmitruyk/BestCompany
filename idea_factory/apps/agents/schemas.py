@@ -204,6 +204,32 @@ class ScheduleProposalOutput(BaseModel):
     rationale: str = Field(default="", description="Why this date was chosen")
 
 
+class CompanyTaskExecutionOutput(BaseModel):
+    """Output when an assigned agent completes a company planning task."""
+
+    result_summary: str = Field(
+        description="Concise outcome for next planning (1-3 sentences)",
+    )
+    result_notes: str = Field(
+        default="",
+        description="Optional detail: links, metrics, follow-ups",
+    )
+    progress_percent: int = Field(
+        default=100,
+        ge=0,
+        le=100,
+        description="Estimated completion 0-100",
+    )
+    outcome_assessment: str = Field(
+        default="success",
+        description="success, partial, or blocked",
+    )
+    needs_human: bool = Field(
+        default=False,
+        description="True if a human must take over (escalate task)",
+    )
+
+
 class ExecutionOutput(BaseModel):
     """Output from executor agent - completion of a calendar action."""
 

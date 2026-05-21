@@ -3,15 +3,26 @@
 {% block title %}{{ task.title }} - {{ company.name }}{% endblock %}
 
 {% block content %}
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+
 <header class="mb-6">
-    <a href="{% url 'company_tasks' company_pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">← Tasks</a>
-    <h1 class="text-2xl font-bold text-slate-900 mt-1">{{ task.title }}</h1>
-    <p class="text-sm text-slate-600 mt-1">{{ task.description }}</p>
+    <h2 class="text-2xl font-bold text-slate-900">{{ task.title }}</h2>
+    <p class="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{{ task.description }}</p>
+    {% if execution_hint %}
+    <p class="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2" role="note">
+        <span class="font-medium">Automatic execution:</span> {{ execution_hint }}
+    </p>
+    {% elif task.status == 'TODO' and task.assigned_agent %}
+    <p class="mt-3 text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2" role="note">
+        Eligible for agent execution on the ticker or <a href="{% url 'company_tasks' company_pk=company.pk %}" class="underline font-medium">Run agent tasks now</a>.
+    </p>
+    {% endif %}
 </header>
 
 <div class="grid gap-6 lg:grid-cols-2">
     <section class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">Update task</h2>
+        <h3 class="text-lg font-semibold text-slate-900 mb-4">Update task</h3>
         <form method="post" class="space-y-4">
             {% csrf_token %}
             <div>
@@ -23,7 +34,7 @@
                 </select>
             </div>
             <div>
-                <label for="progress_percent" class="block text-sm font-medium text-slate-700 mb-1">Progress %</label>
+                <label for="progress_percent" class="block text-sm font-medium text-slate-700 mb-1">progress_percent (0–100)</label>
                 <input type="number" name="progress_percent" id="progress_percent" min="0" max="100" value="{{ task.progress_percent }}" class="form-control">
             </div>
             <div>
@@ -45,14 +56,14 @@
                 </select>
             </div>
             <div>
-                <label for="result_summary" class="block text-sm font-medium text-slate-700 mb-1">Result (when done)</label>
+                <label for="result_summary" class="block text-sm font-medium text-slate-700 mb-1">Result summary (for next planning)</label>
                 <textarea name="result_summary" id="result_summary" rows="3" class="form-control" placeholder="Outcome for next planning…">{{ task.result_summary }}</textarea>
             </div>
             <div>
                 <label for="result_notes" class="block text-sm font-medium text-slate-700 mb-1">Result notes / links</label>
                 <textarea name="result_notes" id="result_notes" rows="2" class="form-control">{{ task.result_notes }}</textarea>
             </div>
-            <button type="submit" class="btn-primary w-full sm:w-auto">Save</button>
+            <button type="submit" class="btn-primary w-full sm:w-auto">Save changes</button>
         </form>
         {% if task.assignee_type == 'agent' and task.status != 'DONE' %}
         <form method="post" action="{% url 'company_task_escalate' company_pk=company.pk task_pk=task.pk %}" class="mt-4 pt-4 border-t border-slate-200">
@@ -65,7 +76,7 @@
 
     <section class="space-y-4">
         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h2 class="text-lg font-semibold text-slate-900 mb-3">Dependencies</h2>
+            <h3 class="text-lg font-semibold text-slate-900 mb-3">Dependencies</h3>
             {% if dependencies %}
             <ul class="text-sm space-y-2">
                 {% for dep in dependencies %}
@@ -90,6 +101,7 @@
         {% if task.planning_session %}
         <p class="text-sm text-slate-500">From planning <a href="{% url 'company_planning_detail' company_pk=company.pk session_pk=task.planning_session.pk %}" class="text-indigo-600 hover:underline">{{ task.planning_session.week_start|date:"M j, Y" }}</a></p>
         {% endif %}
+        <a href="{% url 'company_tasks' company_pk=company.pk %}" class="text-sm text-indigo-600 hover:underline font-medium">← Back to task board</a>
     </section>
 </div>
 {% endblock %}

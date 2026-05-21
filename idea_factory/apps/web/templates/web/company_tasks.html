@@ -4,27 +4,32 @@
 {% block title %}Tasks - {{ company.name }}{% endblock %}
 
 {% block content %}
-<header class="mb-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
-    <div>
-        <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">← {{ company.name }}</a>
-        <h1 class="text-2xl font-bold text-slate-900 mt-1">Tasks</h1>
-        <p class="text-sm text-slate-600 mt-1">
-            {{ progress.done_count }} done · {{ progress.in_progress_count }} in progress · {{ progress.blocked_count }} blocked
-            · overall {{ progress.weighted_progress_percent }}%
-        </p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-        <a href="{% url 'company_planning' company_pk=company.pk %}" class="btn-primary">Planning</a>
-        <a href="{% url 'company_direction' company_pk=company.pk %}" class="btn-secondary">Direction</a>
-    </div>
-</header>
+{% guide_hint title="Task board — run and control work" body="Agent tasks run on the hourly ticker when To Do, assigned to AI, unblocked, and within the due lookahead. Use Run agent tasks now for immediate execution. Human-assigned tasks must be updated on the task page. Metrics above use the same names as planning and the ticker logs." %}
+
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+{% include "web/includes/company_attention.html" %}
+{% include "web/includes/company_metrics.html" %}
+
+<div class="mb-6 flex flex-wrap gap-2 items-center justify-between">
+    <form method="post" action="{% url 'company_tasks_run_now' company_pk=company.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-primary"
+            {% if company.status != 'ACTIVE' or runnable_count == 0 %}disabled{% endif %}
+            aria-label="Run agent tasks now"
+            title="{% if runnable_count == 0 %}No eligible agent tasks — see hints on each row{% else %}Run up to {{ runnable_count }} eligible task(s){% endif %}">
+            Run agent tasks now{% if runnable_count %} ({{ runnable_count }}){% endif %}
+        </button>
+    </form>
+    <a href="{% url 'company_planning' company_pk=company.pk %}" class="btn-secondary">Start planning</a>
+</div>
 
 <nav class="mb-4 flex flex-wrap gap-2" aria-label="Filter by status">
     <a href="{% url 'company_tasks' company_pk=company.pk %}"
-        class="px-3 py-1 rounded-full text-sm {% if not status_filter %}bg-indigo-100 text-indigo-800{% else %}bg-slate-100 text-slate-600{% endif %}">All</a>
+        class="px-3 py-1 rounded-full text-sm {% if not status_filter %}bg-indigo-100 text-indigo-800 font-medium{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">All</a>
     {% for value, label in status_choices %}
     <a href="{% url 'company_tasks' company_pk=company.pk %}?status={{ value }}"
-        class="px-3 py-1 rounded-full text-sm {% if status_filter == value %}bg-indigo-100 text-indigo-800{% else %}bg-slate-100 text-slate-600{% endif %}">{{ label }}</a>
+        class="px-3 py-1 rounded-full text-sm {% if status_filter == value %}bg-indigo-100 text-indigo-800 font-medium{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">{{ label }}</a>
     {% endfor %}
 </nav>
 
@@ -35,6 +40,11 @@
             <div class="min-w-0 flex-1">
                 <a href="{% url 'company_task_detail' company_pk=company.pk task_pk=task.pk %}" class="font-semibold text-slate-900 hover:text-indigo-700">{{ task.title }}</a>
                 <p class="text-sm text-slate-600 mt-1 line-clamp-2">{{ task.description|truncatewords:40 }}</p>
+                {% if task.execution_hint %}
+                <p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 mt-2" role="note">
+                    <span class="font-medium">Not auto-runnable:</span> {{ task.execution_hint }}
+                </p>
+                {% endif %}
                 {% if task.dependencies.all %}
                 <p class="text-xs text-slate-500 mt-2">
                     Depends on:
@@ -43,6 +53,9 @@
                     {% endfor %}
                     {% if task.is_blocked_by_dependencies %}<span class="text-amber-700 font-medium">· blocked</span>{% endif %}
                 </p>
+                {% endif %}
+                {% if task.result_summary and task.status == 'DONE' %}
+                <p class="text-xs text-slate-600 mt-2 border-l-2 border-emerald-300 pl-2">Result: {{ task.result_summary|truncatewords:25 }}</p>
                 {% endif %}
             </div>
             <div class="flex flex-col items-end gap-2 shrink-0 text-sm">
@@ -53,22 +66,23 @@
                     {% else %}bg-slate-100 text-slate-700{% endif %}">
                     {{ task.get_status_display }}
                 </span>
-                <div class="w-32 h-2 bg-slate-100 rounded-full overflow-hidden" role="progressbar" aria-valuenow="{{ task.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                <div class="w-32 h-2 bg-slate-100 rounded-full overflow-hidden" role="progressbar" aria-valuenow="{{ task.progress_percent }}" aria-valuemin="0" aria-valuemax="100" aria-label="Task progress">
                     <div class="h-full bg-indigo-500 rounded-full" style="width: {{ task.progress_percent }}%"></div>
                 </div>
-                <span class="text-slate-500 text-xs">
+                <span class="text-slate-500 text-xs text-right">
                     {% if task.assigned_agent %}{{ task.assigned_agent.name }} (AI)
                     {% elif task.assigned_human %}{{ task.assigned_human.name }} (human)
                     {% else %}Unassigned{% endif %}
                     {% if task.escalated_to_human %} · escalated{% endif %}
                 </span>
                 {% if task.target_date %}<time class="text-xs text-slate-400" datetime="{{ task.target_date|date:'Y-m-d' }}">Due {{ task.target_date|date:"M j" }}</time>{% endif %}
+                <a href="{% url 'company_task_detail' company_pk=company.pk task_pk=task.pk %}" class="text-xs text-indigo-600 hover:underline font-medium">Edit / control →</a>
             </div>
         </div>
     </article>
     {% empty %}
     <p class="text-slate-500 p-6 bg-white rounded-xl border border-slate-200">
-        No tasks yet. <a href="{% url 'company_planning' company_pk=company.pk %}" class="text-indigo-600 hover:underline">Run a planning session</a> to generate a weekly scope.
+        No tasks yet. <a href="{% url 'company_planning' company_pk=company.pk %}" class="text-indigo-600 hover:underline">Run a planning session</a> to generate weekly scope aligned with your KPIs.
     </p>
     {% endfor %}
 </div>

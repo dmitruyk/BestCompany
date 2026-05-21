@@ -1,0 +1,65 @@
+<header class="mb-4 flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-start">
+    <div class="min-w-0">
+        <a href="{% url 'company_list' %}" class="text-sm text-slate-500 hover:text-indigo-600">← All companies</a>
+        <h1 class="text-2xl font-bold text-slate-900 mt-1 truncate">{{ company.name }}</h1>
+        <p class="mt-1 text-sm text-slate-600 truncate">Idea: {{ company.idea_request.title }}</p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                {% if company.status == 'REGENERATING_AGENTS' %}bg-blue-100 text-blue-800
+                {% elif company.status == 'ACTIVE' %}bg-green-100 text-green-800
+                {% else %}bg-slate-100 text-slate-800{% endif %}">
+                {{ company.get_status_display }}
+            </span>
+            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                {% if readiness.phase == 'Production' %}bg-emerald-100 text-emerald-800
+                {% elif readiness.phase == 'Validation' %}bg-blue-100 text-blue-800
+                {% elif readiness.phase == 'Optimization' %}bg-amber-100 text-amber-800
+                {% else %}bg-slate-100 text-slate-700{% endif %}"
+                title="Company lifecycle phase from readiness checks">
+                Phase: {{ readiness.phase }}
+            </span>
+            {% if go_no_go %}
+            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                {% if 'GO' in go_no_go|upper and 'NO' not in go_no_go|upper %}bg-emerald-100 text-emerald-800
+                {% elif 'NO' in go_no_go|upper %}bg-red-100 text-red-800
+                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                {{ go_no_go }}
+            </span>
+            {% endif %}
+            {% if company.autonomous_mode %}
+            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-800">Self-Run</span>
+            {% else %}
+            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-700">Manual</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="flex flex-wrap gap-2 items-center shrink-0" role="toolbar" aria-label="Company controls">
+        {% if company.status != 'REGENERATING_AGENTS' %}
+        <form method="post" action="{% url 'toggle_autonomous_mode' pk=company.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit"
+                class="btn {% if company.autonomous_mode %}bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200{% else %}btn-secondary{% endif %}"
+                aria-label="Toggle autonomous mode"
+                title="{% if company.autonomous_mode %}Self-Run: agents select, schedule, execute. Click for manual approval.{% else %}Manual: you approve actions. Click for self-run.{% endif %}">
+                {% if company.autonomous_mode %}🤖 Self-Run{% else %}👤 Manual{% endif %}
+            </button>
+        </form>
+        {% if counts.unscheduled_selected > 0 %}
+        <form method="post" action="{% url 'run_autonomous_loop_now' pk=company.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="btn bg-emerald-600 text-white hover:bg-emerald-700"
+                aria-label="Schedule selected actions">
+                Schedule ({{ counts.unscheduled_selected }})
+            </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'start_discussion' company_pk=company.pk %}" class="btn-primary">New discussion</a>
+        <form method="post" action="{% url 'regenerate_agents' pk=company.pk %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="btn-secondary text-amber-800 border-amber-300" aria-label="Regenerate agents">
+                Regenerate agents
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</header>

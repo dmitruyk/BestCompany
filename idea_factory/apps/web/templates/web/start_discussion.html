@@ -4,9 +4,11 @@
 {% block title %}Start Discussion - {{ company.name }}{% endblock %}
 
 {% block content %}
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+
 <div class="mb-4">
-    <a href="{% url 'company_detail' pk=company.pk %}" class="link-back">← {{ company.name }}</a>
-    <h1 class="text-xl font-bold text-slate-900 mt-1">Start Director Discussion</h1>
+    <h2 class="text-xl font-bold text-slate-900">Start director discussion</h2>
 </div>
 
 {% discussion_topic_examples as topic_examples %}

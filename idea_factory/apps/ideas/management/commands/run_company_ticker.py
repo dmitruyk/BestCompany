@@ -13,6 +13,9 @@ Environment:
   TICKER_WEEKLY_PLANNING   — run run_weekly_planning on Mondays (default true)
   TICKER_WEEKLY_PLANNING_HOUR — local hour (0-23) to allow weekly planning (default 8)
   TICKER_STALE_PLANNING_HOURS — hours before IN_PROGRESS planning is FAILED (default 2)
+  TICKER_TASK_EXECUTION — run agent TODO tasks automatically (default true)
+  TICKER_TASK_MAX_PER_COMPANY — max tasks per company per tick (default 2)
+  TICKER_TASK_AUTONOMOUS_ONLY — only Self-Run companies (default false)
 """
 from __future__ import annotations
 
@@ -45,6 +48,9 @@ def run_ticker_tick(*, dry_run: bool = False) -> None:
         logger.info("Dry run — no changes.")
         logger.info("Would run activity_checks(stale_planning_hours=%s)", stale_hours)
         logger.info("Would run autonomous_loop")
+        from apps.ideas.task_execution import run_company_task_execution
+
+        run_company_task_execution(dry_run=True)
         if should_run_weekly_planning_now():
             logger.info("Would run weekly_planning (Monday)")
         return
@@ -54,18 +60,27 @@ def run_ticker_tick(*, dry_run: bool = False) -> None:
         logger.info("Activity check: %s", msg)
 
     from apps.ideas.autonomous_loop import run_autonomous_loop
+    from apps.ideas.task_execution import run_company_task_execution
 
     run_autonomous_loop()
+
+    task_result = run_company_task_execution()
+    for msg in task_result.messages:
+        logger.info("Task execution: %s", msg)
 
     if should_run_weekly_planning_now():
         logger.info("Running weekly planning (Monday).")
         call_command("run_weekly_planning")
 
     logger.info(
-        "Ticker tick done (active=%s open_tasks=%s overdue=%s).",
+        "Ticker tick done (active=%s open_tasks=%s overdue=%s "
+        "tasks_started=%s tasks_done=%s tasks_failed=%s).",
         check_result.active_companies,
         check_result.open_tasks,
         check_result.overdue_tasks,
+        task_result.tasks_started,
+        task_result.tasks_completed,
+        task_result.tasks_failed,
     )
 
 

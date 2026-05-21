@@ -22,10 +22,11 @@ from apps.ideas.models import (
     PlanningSession,
 )
 from apps.ideas.planning import monday_of_week, spawn_planning_process, start_planning_session
-from apps.ideas.planning_context import (
-    build_strategic_planning_context,
-    compute_progress_metrics,
-    get_active_direction,
+from apps.ideas.planning_context import build_strategic_planning_context, get_active_direction
+from apps.ideas.task_execution import get_runnable_tasks, run_task_execution_for_company
+from apps.web.company_workspace import (
+    annotate_task_execution_hints,
+    build_company_workspace_context,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,25 +51,63 @@ def company_tasks(request: HttpRequest, company_pk: str) -> HttpResponse:
     if status_filter and status_filter in dict(CompanyTask.Status.choices):
         qs = qs.filter(status=status_filter)
 
-    progress = compute_progress_metrics(company)
-    direction = get_active_direction(company)
-    agents = company.agents.all()
-    humans = company.team_members.filter(is_active=True)
-
-    return render(
-        request,
-        "web/company_tasks.html",
+    tasks = list(qs)
+    annotate_task_execution_hints(tasks)
+    ctx = build_company_workspace_context(company, active_tab="tasks")
+    ctx.update(
         {
-            "company": company,
-            "tasks": qs,
-            "progress": progress,
-            "direction": direction,
+            "tasks": tasks,
             "status_filter": status_filter,
             "status_choices": CompanyTask.Status.choices,
-            "agents": agents,
-            "humans": humans,
-        },
+            "runnable_count": ctx["counts"]["runnable_tasks"],
+        }
     )
+    return render(request, "web/company_tasks.html", ctx)
+
+
+@login_required
+@require_POST
+def company_tasks_run_now(request: HttpRequest, company_pk: str) -> HttpResponse:
+    """Run eligible agent tasks immediately (same logic as the background ticker)."""
+    company = get_company_for_user(request.user, company_pk)
+    if company.status != Company.Status.ACTIVE:
+        messages.error(request, "Company must be active to run tasks.")
+        return redirect("company_tasks", company_pk=company_pk)
+
+    runnable = get_runnable_tasks(company, limit=10)
+    if not runnable:
+        messages.warning(
+            request,
+            "No agent tasks are ready. Tasks must be To Do, assigned to an AI agent, "
+            "not blocked by dependencies, and due within the lookahead window. "
+            "Human-assigned tasks must be completed manually.",
+        )
+        return redirect("company_tasks", company_pk=company_pk)
+
+    max_tasks = min(10, max(1, len(runnable)))
+    try:
+        result = run_task_execution_for_company(company, max_tasks=max_tasks)
+    except Exception:
+        logger.exception("Manual task execution failed for company %s", company.pk)
+        messages.error(
+            request,
+            "Task execution failed. Check LLM settings and server logs.",
+        )
+        return redirect("company_tasks", company_pk=company_pk)
+
+    parts: list[str] = []
+    if result.tasks_completed:
+        parts.append(f"Completed {result.tasks_completed} task(s).")
+    if result.tasks_partial:
+        parts.append(f"{result.tasks_partial} task(s) in progress with partial results.")
+    if result.tasks_escalated:
+        parts.append(f"Escalated {result.tasks_escalated} task(s) to human.")
+    if result.tasks_failed:
+        parts.append(f"{result.tasks_failed} task(s) failed (reverted to To Do).")
+    if not parts:
+        parts.append("No tasks were executed.")
+    messages.success(request, " ".join(parts))
+    return redirect("company_tasks", company_pk=company_pk)
 
 
 @login_required
@@ -91,19 +130,27 @@ def company_task_detail(
         _apply_task_update(request, company, task)
         return redirect("company_task_detail", company_pk=company_pk, task_pk=task_pk)
 
-    return render(
-        request,
-        "web/company_task_detail.html",
+    from apps.ideas.task_execution import explain_task_skip
+
+    ctx = build_company_workspace_context(company, active_tab="tasks")
+    ctx.update(
         {
-            "company": company,
             "task": task,
             "dependencies": dependencies,
             "dependents": dependents,
             "status_choices": CompanyTask.Status.choices,
             "agents": company.agents.all(),
             "humans": company.team_members.filter(is_active=True),
-        },
+            "execution_hint": (
+                explain_task_skip(task)
+                if task.status == CompanyTask.Status.TODO
+                else None
+            ),
+        }
     )
+    if ctx["execution_hint"] == "eligible":
+        ctx["execution_hint"] = None
+    return render(request, "web/company_task_detail.html", ctx)
 
 
 def _apply_task_update(request: HttpRequest, company: Company, task: CompanyTask) -> None:
@@ -205,19 +252,9 @@ def company_task_escalate(
 def company_planning(request: HttpRequest, company_pk: str) -> HttpResponse:
     company = get_company_for_user(request.user, company_pk)
     sessions = company.planning_sessions.all()[:15]
-    direction = get_active_direction(company)
-    progress = compute_progress_metrics(company)
-    return render(
-        request,
-        "web/company_planning.html",
-        {
-            "company": company,
-            "sessions": sessions,
-            "direction": direction,
-            "progress": progress,
-            "week_start": monday_of_week(),
-        },
-    )
+    ctx = build_company_workspace_context(company, active_tab="planning")
+    ctx.update({"sessions": sessions, "week_start": monday_of_week()})
+    return render(request, "web/company_planning.html", ctx)
 
 
 @login_required
@@ -251,15 +288,9 @@ def company_planning_detail(
             queryset=CompanyTaskDependency.objects.select_related("depends_on"),
         )
     )
-    return render(
-        request,
-        "web/company_planning_detail.html",
-        {
-            "company": company,
-            "session": session,
-            "tasks": tasks,
-        },
-    )
+    ctx = build_company_workspace_context(company, active_tab="planning")
+    ctx.update({"session": session, "tasks": tasks})
+    return render(request, "web/company_planning_detail.html", ctx)
 
 
 @login_required
@@ -321,15 +352,9 @@ def company_direction(request: HttpRequest, company_pk: str) -> HttpResponse:
         return redirect("company_direction", company_pk=company_pk)
 
     directions = company.strategic_directions.all()[:10]
-    return render(
-        request,
-        "web/company_direction.html",
-        {
-            "company": company,
-            "direction": direction,
-            "directions": directions,
-        },
-    )
+    ctx = build_company_workspace_context(company, active_tab="direction")
+    ctx.update({"directions": directions})
+    return render(request, "web/company_direction.html", ctx)
 
 
 @login_required
@@ -340,14 +365,11 @@ def company_history(request: HttpRequest, company_pk: str) -> HttpResponse:
         company.history_entries.select_related("related_task", "related_planning_session")
         .order_by("-created_at")[:80]
     )
-    progress = compute_progress_metrics(company)
-    return render(
-        request,
-        "web/company_history.html",
+    ctx = build_company_workspace_context(company, active_tab="history")
+    ctx.update(
         {
-            "company": company,
             "entries": entries,
-            "progress": progress,
             "context_preview": build_strategic_planning_context(company)[:1200],
-        },
+        }
     )
+    return render(request, "web/company_history.html", ctx)

@@ -3,9 +3,12 @@
 {% block title %}Planning session - {{ company.name }}{% endblock %}
 
 {% block content %}
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+
 <header class="mb-6">
-    <a href="{% url 'company_planning' company_pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">← Planning</a>
-    <h1 class="text-2xl font-bold text-slate-900 mt-1">Planning session</h1>
+    <a href="{% url 'company_planning' company_pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">← Planning sessions</a>
+    <h2 class="text-xl font-bold text-slate-900 mt-1">Planning session</h2>
     <p class="text-sm text-slate-600 mt-1">
         {{ session.get_trigger_display }} · week {{ session.week_start|date:"M j, Y" }}
         · <span id="session-status">{{ session.get_status_display }}</span>

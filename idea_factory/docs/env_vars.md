@@ -28,6 +28,10 @@
 | `TICKER_WEEKLY_PLANNING` | `true` | Run `run_weekly_planning` on Mondays from ticker |
 | `TICKER_WEEKLY_PLANNING_HOUR` | `8` | Local hour (0–23) when Monday planning is allowed |
 | `TICKER_STALE_PLANNING_HOURS` | `2` | Mark stuck `IN_PROGRESS` planning sessions as FAILED |
+| `TICKER_TASK_EXECUTION` | `true` | Auto-run agent-assigned company tasks from the ticker |
+| `TICKER_TASK_MAX_PER_COMPANY` | `2` | Max tasks executed per company per ticker tick |
+| `TICKER_TASK_AUTONOMOUS_ONLY` | `false` | If `true`, only companies with Self-Run (`autonomous_mode`) |
+| `TICKER_TASK_DUE_LOOKAHEAD_DAYS` | `7` | Start tasks whose `target_date` is within this many days (not only overdue) |
 
 Copy `.env.example` to `.env` and load with `python-dotenv` or your preferred method.
 

@@ -14,10 +14,12 @@
 {% guide_hint title="What to do next" body="Fix the issue described below (directors, LLM config, or server logs), then click Re-run to start the discussion again." %}
 {% endif %}
 
-<div class="mb-4 flex justify-between items-start">
-    <div>
-        <a href="{% url 'company_detail' pk=company.pk %}" class="link-back">← {{ company.name }}</a>
-        <h1 class="text-xl font-bold text-slate-900 mt-1">{{ discussion.topic }}</h1>
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+
+<div class="mb-4 flex justify-between items-start gap-4">
+    <div class="min-w-0">
+        <h2 class="text-xl font-bold text-slate-900">{{ discussion.topic }}</h2>
         <span class="inline-flex mt-2 px-2 py-1 text-xs font-medium rounded-full
         {% if discussion.status == 'AWAITING_SELECTION' %}bg-amber-100 text-amber-800
         {% elif discussion.status == 'COMPLETED' %}bg-green-100 text-green-800

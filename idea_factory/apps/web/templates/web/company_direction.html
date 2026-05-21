@@ -3,11 +3,24 @@
 {% block title %}Direction - {{ company.name }}{% endblock %}
 
 {% block content %}
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+
 <header class="mb-6">
-    <a href="{% url 'company_detail' pk=company.pk %}" class="text-sm text-indigo-600 hover:underline">← {{ company.name }}</a>
-    <h1 class="text-2xl font-bold text-slate-900 mt-1">Strategic direction</h1>
-    <p class="text-sm text-slate-600 mt-1">Agree or clarify with founders before weekly planning.</p>
+    <h2 class="text-lg font-semibold text-slate-900">Strategic direction</h2>
+    <p class="text-sm text-slate-600 mt-1">Agree or clarify with founders before weekly planning. KPIs on Overview should align with this statement.</p>
 </header>
+
+{% if dev_plan.kpis %}
+<div class="mb-6 p-4 rounded-xl border border-indigo-100 bg-indigo-50/30 text-sm">
+    <p class="font-medium text-slate-800">Pipeline KPIs to align with</p>
+    <ul class="mt-2 list-disc list-inside text-slate-700">
+        {% for k in dev_plan.kpis %}
+        <li>{{ k }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
 
 <form method="post" class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-6 space-y-4">
     {% csrf_token %}
