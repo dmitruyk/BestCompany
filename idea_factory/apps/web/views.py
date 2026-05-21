@@ -773,6 +773,7 @@ def director_discussion_detail(request: HttpRequest, company_pk: str, discussion
     from apps.ideas.models import DirectorDiscussion
 
     discussion = get_object_or_404(DirectorDiscussion, pk=discussion_pk, company=company)
+    discussion.try_complete_selection()
     actions = discussion.actions.all()
     ctx = build_company_workspace_context(company, active_tab="discussions")
     ctx.update(
@@ -793,6 +794,7 @@ def action_select(request: HttpRequest, company_pk: str, action_pk: str) -> Http
     action = get_object_or_404(ActionProposal, pk=action_pk, discussion__company=company)
     action.status = ActionProposal.ActionStatus.SELECTED
     action.save(update_fields=["status"])
+    action.discussion.try_complete_selection()
     return redirect(
         "action_schedule",
         company_pk=company_pk,
@@ -851,6 +853,7 @@ def action_reject(request: HttpRequest, company_pk: str, action_pk: str) -> Http
     action = get_object_or_404(ActionProposal, pk=action_pk, discussion__company=company)
     action.status = ActionProposal.ActionStatus.REJECTED
     action.save(update_fields=["status"])
+    action.discussion.try_complete_selection()
     return redirect(
         "director_discussion_detail",
         company_pk=company_pk,
@@ -1135,6 +1138,7 @@ def _run_director_discussion(discussion) -> None:
         if discussion.company.autonomous_mode:
             from apps.agents.autonomous import agent_select_actions
             agent_select_actions(discussion)
+        discussion.try_complete_selection()
     except Exception as e:
         logger.exception("Director discussion failed: %s", e)
         discussion.status = DirectorDiscussion.Status.FAILED

@@ -7,7 +7,7 @@
 {% if discussion.status == 'ACTIVE' %}
 {% guide_hint title="Discussion in progress" body="Directors are debating this topic. This page refreshes automatically when messages or action proposals appear. Use Interrupt & Re-run only if the discussion is stuck or you want a fresh debate." %}
 {% elif discussion.status == 'AWAITING_SELECTION' %}
-{% guide_hint title="Your turn — review proposals" body="Read each action below. Click Select for items you want to implement, or Reject to dismiss. When finished, use Schedule selected on this page or from the company overview to add them to the calendar." %}
+{% guide_hint title="Your turn — review proposals" body="There is no separate confirm/reject for the discussion itself. For each action below, click Select or Reject. When every proposal is decided, the discussion moves to Completed. Use Schedule selected to put approved actions on the calendar." %}
 {% elif discussion.status == 'COMPLETED' %}
 {% guide_hint title="Discussion completed" body="Selected actions should appear on the calendar. Open Calendar from the company page to track progress, or start a new discussion for the next topic." %}
 {% elif discussion.status == 'FAILED' %}

@@ -286,6 +286,16 @@ class DirectorDiscussion(models.Model):
     def __str__(self) -> str:
         return f"{self.topic} ({self.status})"
 
+    def try_complete_selection(self) -> bool:
+        """Mark COMPLETED when owner (or agent) resolved every proposed action."""
+        if self.status != self.Status.AWAITING_SELECTION:
+            return False
+        if self.actions.filter(status=ActionProposal.ActionStatus.PROPOSED).exists():
+            return False
+        self.status = self.Status.COMPLETED
+        self.save(update_fields=["status", "updated_at"])
+        return True
+
 
 class DiscussionMessage(models.Model):
     """Message in a director discussion (from agent or user)."""
