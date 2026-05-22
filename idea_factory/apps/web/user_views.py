@@ -27,6 +27,7 @@ def _staff_required(view_func):
 def user_list(request: HttpRequest) -> HttpResponse:
     users = (
         User.objects.select_related("profile")
+        .prefetch_related("team_memberships__company")
         .order_by("username")
         .all()
     )

@@ -62,10 +62,13 @@
                     Idea Factory
                 </a>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    {% if has_team_memberships %}
+                    <a href="{% url 'my_tasks' %}" class="link-nav">My Tasks</a>
+                    {% endif %}
                     <a href="{% url 'company_list' %}" class="link-nav">
                         {% if is_app_admin %}Companies{% else %}My Companies{% endif %}
                     </a>
-                    {% if can_create_ideas %}
+                    {% if can_create_ideas and not is_team_member_only %}
                     <a href="{% url 'new_idea' %}" class="link-nav text-indigo-600 hover:text-indigo-800">New Request</a>
                     {% endif %}
                     {% if user.is_authenticated %}

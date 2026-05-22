@@ -23,6 +23,9 @@
 <div class="grid gap-6 lg:grid-cols-2">
     <section class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
         <h3 class="text-lg font-semibold text-slate-900 mb-4">Update task</h3>
+        {% if not can_update_task %}
+        <p class="text-sm text-slate-600">You do not have permission to update this task.</p>
+        {% else %}
         <form method="post" class="space-y-4">
             {% csrf_token %}
             <div>
@@ -37,6 +40,7 @@
                 <label for="progress_percent" class="block text-sm font-medium text-slate-700 mb-1">progress_percent (0–100)</label>
                 <input type="number" name="progress_percent" id="progress_percent" min="0" max="100" value="{{ task.progress_percent }}" class="form-control">
             </div>
+            {% if can_reassign_task %}
             <div>
                 <label for="assigned_agent_id" class="block text-sm font-medium text-slate-700 mb-1">Assign to agent</label>
                 <select name="assigned_agent_id" id="assigned_agent_id" class="form-control">
@@ -55,6 +59,7 @@
                     {% endfor %}
                 </select>
             </div>
+            {% endif %}
             <div>
                 <label for="result_summary" class="block text-sm font-medium text-slate-700 mb-1">Result summary (for next planning)</label>
                 <textarea name="result_summary" id="result_summary" rows="3" class="form-control" placeholder="Outcome for next planning…">{{ task.result_summary }}</textarea>
@@ -65,7 +70,8 @@
             </div>
             <button type="submit" class="btn-primary w-full sm:w-auto">Save changes</button>
         </form>
-        {% if task.assignee_type == 'agent' and task.status != 'DONE' %}
+        {% endif %}
+        {% if can_manage_company and task.assignee_type == 'agent' and task.status != 'DONE' %}
         <form method="post" action="{% url 'company_task_escalate' company_pk=company.pk task_pk=task.pk %}" class="mt-4 pt-4 border-t border-slate-200">
             {% csrf_token %}
             <p class="text-sm text-slate-600 mb-2">Agent cannot complete this task?</p>

@@ -6,6 +6,7 @@ from . import (
     company_planning_views,
     google_calendar_views,
     llm_settings_views,
+    task_views,
     user_views,
     views,
 )
@@ -56,6 +57,7 @@ urlpatterns = [
     path("ideas/<uuid:pk>/delete/confirm/", views.delete_idea, name="delete_idea"),
     path("ideas/<uuid:pk>/save-conclusion/", views.save_conclusion, name="save_conclusion"),
     path("ideas/<uuid:pk>/download/", views.download_json, name="download_json"),
+    path("my-tasks/", task_views.my_tasks, name="my_tasks"),
     path("companies/", views.company_list, name="company_list"),
     path("companies/<uuid:pk>/", views.company_detail, name="company_detail"),
     path("companies/<uuid:pk>/team/add/", views.add_team_member, name="add_team_member"),

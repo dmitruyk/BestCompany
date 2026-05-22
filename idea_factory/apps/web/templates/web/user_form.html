@@ -17,7 +17,13 @@
         {% for field in form %}
         <div>
             <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+            {% if field.name == "link_team_members" %}
+            <div class="max-h-48 overflow-y-auto rounded-lg border border-slate-200 p-3 bg-slate-50">
+                {{ field }}
+            </div>
+            {% else %}
             {{ field }}
+            {% endif %}
             {% if field.help_text %}<p class="text-xs text-slate-500 mt-1">{{ field.help_text }}</p>{% endif %}
             {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
         </div>

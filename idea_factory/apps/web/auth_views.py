@@ -7,12 +7,15 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
+from apps.core.access import user_is_team_member_only
 from apps.core.forms import AppLoginForm, ForcePasswordChangeForm
 
 
 def _redirect_after_login(user) -> str:
     if getattr(user, "profile", None) and user.profile.must_change_password:
         return reverse("force_password_change")
+    if user_is_team_member_only(user):
+        return reverse("my_tasks")
     return reverse("home")
 
 
@@ -56,7 +59,7 @@ def force_password_change(request: HttpRequest) -> HttpResponse:
         profile.save(update_fields=["must_change_password", "updated_at"])
         login(request, request.user)
         messages.success(request, "Password updated. You can now use Idea Factory.")
-        return redirect("home")
+        return redirect(_redirect_after_login(request.user))
 
     return render(
         request,

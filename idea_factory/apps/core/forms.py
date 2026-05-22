@@ -4,8 +4,43 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
 from apps.core.models import ServiceLLMConfig, UserProfile
+from apps.ideas.models import CompanyTeamMember
 
 User = get_user_model()
+
+_TEAM_MEMBER_WIDGET = forms.CheckboxSelectMultiple(
+    attrs={"class": "space-y-2 text-sm text-slate-700"}
+)
+
+
+def unlinked_team_members_queryset():
+    return (
+        CompanyTeamMember.objects.filter(is_active=True, user__isnull=True)
+        .select_related("company")
+        .order_by("company__name", "name")
+    )
+
+
+def link_team_members_to_user(user: User, members) -> None:
+    """Attach team member records to a user; clears previous links for those rows."""
+    if not members:
+        return
+    for member in members:
+        if member.user_id and member.user_id != user.pk:
+            raise ValueError(
+                f"Team member {member.name} is already linked to another user."
+            )
+    CompanyTeamMember.objects.filter(pk__in=[m.pk for m in members]).update(user=user)
+
+
+def sync_user_team_members(user: User, selected_members) -> None:
+    """Set user's team memberships to exactly the selected active members."""
+    selected_ids = {m.pk for m in selected_members}
+    CompanyTeamMember.objects.filter(user=user).exclude(pk__in=selected_ids).update(
+        user=None
+    )
+    if selected_ids:
+        CompanyTeamMember.objects.filter(pk__in=selected_ids).update(user=user)
 
 _INPUT_CLASS = (
     "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 "
@@ -135,6 +170,30 @@ class AppUserCreationForm(forms.Form):
         help_text="Admins see all ideas and companies and can manage users.",
         widget=forms.CheckboxInput(attrs={"class": _CHECKBOX_CLASS}),
     )
+    link_team_members = forms.ModelMultipleChoiceField(
+        queryset=CompanyTeamMember.objects.none(),
+        required=False,
+        label="Link to existing humans (team members)",
+        help_text=(
+            "Select company humans to connect to this login. "
+            "The user will see those companies and tasks assigned to them. "
+            "Typically disable “Create ideas/companies” for linked-only users."
+        ),
+        widget=_TEAM_MEMBER_WIDGET,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["link_team_members"].queryset = unlinked_team_members_queryset()
+
+    def clean_link_team_members(self):
+        members = self.cleaned_data.get("link_team_members") or []
+        for member in members:
+            if member.user_id:
+                raise forms.ValidationError(
+                    f"{member.name} ({member.company.name}) is already linked to a user."
+                )
+        return members
 
     def clean_username(self):
         username = self.cleaned_data["username"].strip()
@@ -170,6 +229,9 @@ class AppUserCreationForm(forms.Form):
                 "updated_at",
             ]
         )
+        members = self.cleaned_data.get("link_team_members") or []
+        if members:
+            link_team_members_to_user(user, members)
         return user
 
 
@@ -217,10 +279,26 @@ class AppUserEditForm(forms.Form):
         label="Set new password (optional)",
         widget=forms.PasswordInput(attrs={"class": _INPUT_CLASS, "autocomplete": "new-password"}),
     )
+    link_team_members = forms.ModelMultipleChoiceField(
+        queryset=CompanyTeamMember.objects.none(),
+        required=False,
+        label="Linked humans (team members)",
+        help_text=(
+            "Humans linked to this user can log in and access their companies "
+            "and assigned tasks."
+        ),
+        widget=_TEAM_MEMBER_WIDGET,
+    )
 
     def __init__(self, *args, user: User, **kwargs):
         self.user = user
         super().__init__(*args, **kwargs)
+        linked = CompanyTeamMember.objects.filter(user=user, is_active=True)
+        unlinked = unlinked_team_members_queryset()
+        self.fields["link_team_members"].queryset = (
+            linked | unlinked
+        ).distinct().order_by("company__name", "name")
+        self.fields["link_team_members"].initial = linked
         profile = user.profile
         self.fields["email"].initial = user.email
         self.fields["first_name"].initial = user.first_name
@@ -238,6 +316,15 @@ class AppUserEditForm(forms.Form):
 
             validate_password(password, self.user)
         return password
+
+    def clean_link_team_members(self):
+        members = self.cleaned_data.get("link_team_members") or []
+        for member in members:
+            if member.user_id and member.user_id != self.user.pk:
+                raise forms.ValidationError(
+                    f"{member.name} ({member.company.name}) is already linked to another user."
+                )
+        return members
 
     def save(self) -> User:
         user = self.user
@@ -261,6 +348,9 @@ class AppUserEditForm(forms.Form):
                 "must_change_password",
                 "updated_at",
             ]
+        )
+        sync_user_team_members(
+            user, self.cleaned_data.get("link_team_members") or []
         )
         return user
 

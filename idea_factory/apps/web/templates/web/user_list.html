@@ -6,7 +6,7 @@
 <div class="mb-6 flex justify-between items-center">
     <div>
         <h1 class="text-2xl font-bold text-slate-900">Users</h1>
-        <p class="text-sm text-slate-500 mt-1">Create accounts with default passwords and control idea/company permissions.</p>
+        <p class="text-sm text-slate-500 mt-1">Create accounts, link them to existing company humans, and control idea/company permissions.</p>
     </div>
     <a href="{% url 'user_create' %}" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
         + New user
@@ -34,7 +34,10 @@
                     {% if u.profile.can_create_ideas %}Ideas{% endif %}
                     {% if u.profile.can_create_ideas and u.profile.can_create_companies %} · {% endif %}
                     {% if u.profile.can_create_companies %}Companies{% endif %}
-                    {% if not u.profile.can_create_ideas and not u.profile.can_create_companies %}—{% endif %}
+                    {% if not u.profile.can_create_ideas and not u.profile.can_create_companies and not u.team_memberships.all %}—{% endif %}
+                    {% for m in u.team_memberships.all %}
+                    {% if forloop.first %}<br><span class="text-xs text-slate-500">Linked: {% endif %}{{ m.company.name }}{% if not forloop.last %}, {% endif %}{% if forloop.last %}</span>{% endif %}
+                    {% endfor %}
                 </td>
                 <td class="px-6 py-4 text-sm">
                     {% if not u.is_active %}<span class="text-red-600">Inactive</span>

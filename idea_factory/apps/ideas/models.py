@@ -435,6 +435,14 @@ class CompanyTeamMember(models.Model):
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, related_name="team_members"
     )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="team_memberships",
+        help_text="Login account linked to this human; grants company access and task assignment.",
+    )
     name = models.CharField(max_length=120)
     email = models.EmailField(blank=True, default="")
     role = models.CharField(max_length=30, choices=Role.choices)
@@ -444,6 +452,13 @@ class CompanyTeamMember(models.Model):
 
     class Meta:
         ordering = ["role", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "user"],
+                condition=models.Q(user__isnull=False),
+                name="unique_company_user_team_member",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.get_role_display()})"

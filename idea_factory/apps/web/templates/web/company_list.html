@@ -54,8 +54,12 @@
             {% empty %}
             <tr>
                 <td colspan="6" class="px-6 py-12 text-center text-slate-500">
+                    {% if is_team_member_only %}
+                    No companies linked to your account yet. Ask an administrator to connect your user to a company human.
+                    {% else %}
                     No companies yet. Accept an idea and click <strong>Start Developing</strong> to create your first company.
                     <a href="{% url 'home' %}" class="text-indigo-600 hover:underline ml-1">View ideas</a>.
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}

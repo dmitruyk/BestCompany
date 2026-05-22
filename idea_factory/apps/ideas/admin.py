@@ -122,8 +122,10 @@ class UserAgentMessageAdmin(admin.ModelAdmin):
 
 @admin.register(CompanyTeamMember)
 class CompanyTeamMemberAdmin(admin.ModelAdmin):
-    list_display = ("name", "company", "role", "is_active", "email", "created_at")
+    list_display = ("name", "company", "role", "user", "is_active", "email", "created_at")
     list_filter = ("role", "is_active")
+    search_fields = ("name", "email", "company__name", "user__username")
+    raw_id_fields = ("user",)
 
 
 @admin.register(CompanyCalendarAction)

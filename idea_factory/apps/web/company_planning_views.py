@@ -9,7 +9,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
-from apps.core.access import get_company_for_user
+from apps.core.access import (
+    get_company_for_user,
+    team_members_queryset_for_user,
+    user_can_manage_company,
+    user_can_reassign_task,
+    user_can_update_task,
+    user_is_team_member_only,
+)
 from apps.ideas.company_history import record_history
 from apps.ideas.models import (
     Company,
@@ -50,6 +57,12 @@ def company_tasks(request: HttpRequest, company_pk: str) -> HttpResponse:
     )
     if status_filter and status_filter in dict(CompanyTask.Status.choices):
         qs = qs.filter(status=status_filter)
+
+    if user_is_team_member_only(request.user):
+        member_ids = team_members_queryset_for_user(request.user).values_list(
+            "pk", flat=True
+        )
+        qs = qs.filter(assigned_human_id__in=member_ids)
 
     tasks = list(qs)
     annotate_task_execution_hints(tasks)
@@ -129,7 +142,15 @@ def company_task_detail(
     dependents = task.dependents.select_related("task").all()
 
     if request.method == "POST":
-        _apply_task_update(request, company, task)
+        if not user_can_update_task(request.user, task):
+            messages.error(request, "You cannot update this task.")
+            return redirect("company_task_detail", company_pk=company_pk, task_pk=task_pk)
+        _apply_task_update(
+            request,
+            company,
+            task,
+            allow_reassign=user_can_reassign_task(request.user, task),
+        )
         return redirect("company_task_detail", company_pk=company_pk, task_pk=task_pk)
 
     from apps.ideas.task_execution import explain_task_skip
@@ -148,6 +169,9 @@ def company_task_detail(
                 if task.status == CompanyTask.Status.TODO
                 else None
             ),
+            "can_update_task": user_can_update_task(request.user, task),
+            "can_reassign_task": user_can_reassign_task(request.user, task),
+            "can_manage_company": user_can_manage_company(request.user, company),
         }
     )
     if ctx["execution_hint"] == "eligible":
@@ -155,7 +179,13 @@ def company_task_detail(
     return render(request, "web/company_task_detail.html", ctx)
 
 
-def _apply_task_update(request: HttpRequest, company: Company, task: CompanyTask) -> None:
+def _apply_task_update(
+    request: HttpRequest,
+    company: Company,
+    task: CompanyTask,
+    *,
+    allow_reassign: bool,
+) -> None:
     new_status = request.POST.get("status", "").strip()
     progress = request.POST.get("progress_percent", "").strip()
     result_summary = request.POST.get("result_summary", "").strip()
@@ -181,13 +211,13 @@ def _apply_task_update(request: HttpRequest, company: Company, task: CompanyTask
         task.result_notes = result_notes
         update_fields.append("result_notes")
 
-    if agent_id:
+    if allow_reassign and agent_id:
         agent = get_object_or_404(CompanyAgent, pk=agent_id, company=company)
         task.assigned_agent = agent
         task.assigned_human = None
         task.assignee_type = CompanyTask.AssigneeType.AGENT
         update_fields.extend(["assigned_agent", "assigned_human", "assignee_type"])
-    elif human_id:
+    elif allow_reassign and human_id:
         human = get_object_or_404(CompanyTeamMember, pk=human_id, company=company)
         task.assigned_human = human
         task.assigned_agent = None
