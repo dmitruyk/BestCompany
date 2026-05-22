@@ -14,6 +14,7 @@ from apps.core.google_calendar import (
     is_google_calendar_configured,
     profile_has_google_credentials,
     save_tokens_to_profile,
+    sync_all_owner_calendar_actions,
 )
 from apps.core.models import UserProfile
 
@@ -37,8 +38,19 @@ def google_calendar_settings(request: HttpRequest) -> HttpResponse:
             saved = form.save(commit=False)
             if not connected:
                 saved.google_calendar_sync_enabled = False
+            enabling_sync = (
+                saved.google_calendar_sync_enabled
+                and connected
+                and not profile.google_calendar_sync_enabled
+            )
             saved.save()
-            messages.success(request, "Google Calendar preferences saved.")
+            if enabling_sync:
+                bulk = sync_all_owner_calendar_actions(request.user)
+                messages.success(request, "Google Calendar preferences saved.")
+                if bulk.synced or bulk.failed:
+                    _message_bulk_sync_result(request, bulk)
+            else:
+                messages.success(request, "Google Calendar preferences saved.")
             return redirect("google_calendar_settings")
     else:
         if not profile.google_calendar_reminder_minutes:
@@ -56,6 +68,7 @@ def google_calendar_settings(request: HttpRequest) -> HttpResponse:
             "connected": connected,
             "connected_at": profile.google_calendar_connected_at,
             "default_reminders": default_reminder_minutes(),
+            "sync_enabled": profile.google_calendar_sync_enabled,
         },
     )
 
@@ -102,6 +115,57 @@ def google_calendar_callback(request: HttpRequest) -> HttpResponse:
         "Google Calendar connected. New and updated company calendar actions will sync "
         "to your calendar with reminders.",
     )
+    bulk = sync_all_owner_calendar_actions(request.user)
+    if bulk.synced or bulk.failed:
+        _message_bulk_sync_result(request, bulk)
+    return redirect("google_calendar_settings")
+
+
+def _message_bulk_sync_result(request: HttpRequest, bulk) -> None:
+    if bulk.synced and bulk.failed:
+        messages.warning(
+            request,
+            f"Synced {bulk.synced} calendar action{'s' if bulk.synced != 1 else ''} to Google; "
+            f"{bulk.failed} could not be synced. Check server logs.",
+        )
+    elif bulk.synced:
+        messages.success(
+            request,
+            f"Synced {bulk.synced} existing calendar action"
+            f"{'s' if bulk.synced != 1 else ''} to Google Calendar.",
+        )
+    elif bulk.failed:
+        messages.error(
+            request,
+            "Could not sync calendar actions to Google. Check server logs and your connection.",
+        )
+    else:
+        messages.info(request, "No calendar actions to sync for your companies.")
+
+
+@login_required
+@require_POST
+def google_calendar_sync_existing(request: HttpRequest) -> HttpResponse:
+    """Manually push all existing company calendar actions to Google Calendar."""
+    profile = _get_profile(request.user)
+    if not is_google_calendar_configured():
+        messages.error(
+            request,
+            "Google Calendar is not configured on this server.",
+        )
+        return redirect("google_calendar_settings")
+    if not profile_has_google_credentials(profile):
+        messages.error(request, "Connect Google Calendar before syncing events.")
+        return redirect("google_calendar_settings")
+    if not profile.google_calendar_sync_enabled:
+        messages.error(
+            request,
+            "Enable sync on this page before syncing existing events.",
+        )
+        return redirect("google_calendar_settings")
+
+    bulk = sync_all_owner_calendar_actions(request.user)
+    _message_bulk_sync_result(request, bulk)
     return redirect("google_calendar_settings")
 
 

@@ -6,6 +6,7 @@
 {% block content %}
 {% guide_hint title="How to use the calendar" body="Tap or click a day to see scheduled actions. Use + Add Action for manual tasks. Colored chips show status: planned (amber), in progress (blue), done (green). Today is highlighted with a ring. Selected director actions appear here after you schedule them." %}
 {% guide_hint title="Google Calendar sync" body="Open Google Calendar in the top menu to connect your account. Scheduled actions sync as all-day events with reminders (for example 1 hour and 1 day before)." %}
+{% guide_hint title="Optimize schedule" body="Use Analyze & optimize schedule to redistribute open task due dates (violet chips). Moved tasks update your Google Calendar when sync is enabled. Calendar actions (amber/blue/green) keep their dates unless linked to a moved task." %}
 
 {% include "web/includes/company_header.html" %}
 {% include "web/includes/company_nav.html" %}
@@ -43,6 +44,19 @@
             class="btn-secondary"
             aria-label="Go to current month">Today</a>
         {% endif %}
+        {% if can_manage_company %}
+        <form method="post" action="{% url 'company_calendar_optimize' company_pk=company.pk %}" class="w-full sm:w-auto">
+            {% csrf_token %}
+            <input type="hidden" name="year" value="{{ year }}">
+            <input type="hidden" name="month" value="{{ month }}">
+            <button type="submit" class="btn-secondary w-full sm:w-auto"
+                {% if schedulable_task_count < 2 %}disabled{% endif %}
+                aria-label="Analyze and optimize task schedule"
+                title="{% if schedulable_task_count < 2 %}Need at least two open tasks with due dates{% else %}Use AI to close gaps between task due dates{% endif %}">
+                Analyze &amp; optimize schedule
+            </button>
+        </form>
+        {% endif %}
         <a href="{% url 'calendar_action_add' company_pk=company.pk %}"
             class="btn-primary w-full sm:w-auto">
             + Add Action
@@ -62,6 +76,9 @@
     </span>
     <span class="inline-flex items-center gap-1.5" role="listitem">
         <span class="h-6 w-6 rounded-full ring-2 ring-indigo-600 ring-inset inline-flex items-center justify-center text-[10px] font-bold text-indigo-700" aria-hidden="true">•</span> Current day
+    </span>
+    <span class="inline-flex items-center gap-1.5" role="listitem">
+        <span class="h-2.5 w-2.5 rounded-full bg-violet-400" aria-hidden="true"></span> Task due (AI/human)
     </span>
 </div>
 
@@ -95,7 +112,7 @@
         {% for week in weeks %}
         <div class="grid grid-cols-7 divide-x divide-slate-100 min-h-[3.5rem] sm:min-h-[5rem] md:min-h-[6.5rem] lg:min-h-[7.5rem]" role="row">
             {% for d in week %}
-            {% with entries=actions_by_date|get_item:d %}
+            {% with entries=actions_by_date|get_item:d day_tasks=tasks_by_date|get_item:d %}
             {% with is_today=d|date_eq:today is_clickable=d|date_gte:start_date %}
             <div role="gridcell"
                 class="relative p-0.5 sm:p-1 {% if d.month != month %}bg-slate-50{% endif %} {% if d|date_lt:start_date %}bg-slate-100{% elif is_today %}bg-indigo-50/60{% endif %}">
@@ -110,20 +127,20 @@
                         {% else %}text-slate-900{% endif %}">
                         {{ d.day }}
                     </span>
-                    {% if entries %}
+                    {% if entries or day_tasks %}
                     <div class="mt-auto pt-1 flex flex-wrap gap-0.5 md:hidden" aria-hidden="true">
-                        {% for entry in entries|slice:":5" %}
+                        {% for entry in entries|slice:":4" %}
                         <span class="h-1.5 w-1.5 rounded-full shrink-0
                             {% if entry.status == 'DONE' %}bg-green-500
                             {% elif entry.status == 'IN_PROGRESS' %}bg-blue-500
                             {% else %}bg-amber-400{% endif %}"></span>
                         {% endfor %}
-                        {% if entries|length > 5 %}
-                        <span class="text-[9px] text-slate-500 leading-none">+{{ entries|length|add:"-5" }}</span>
-                        {% endif %}
+                        {% for task in day_tasks|slice:":2" %}
+                        <span class="h-1.5 w-1.5 rounded-full shrink-0 bg-violet-400"></span>
+                        {% endfor %}
                     </div>
                     <div class="mt-1 hidden md:block space-y-0.5 overflow-hidden" aria-hidden="true">
-                        {% for entry in entries|slice:":3" %}
+                        {% for entry in entries|slice:":2" %}
                         <span class="block text-xs truncate rounded px-1 py-0.5
                             {% if entry.status == 'DONE' %}bg-green-100 text-green-800
                             {% elif entry.status == 'IN_PROGRESS' %}bg-blue-100 text-blue-800
@@ -131,9 +148,11 @@
                             {{ entry.title }}
                         </span>
                         {% endfor %}
-                        {% if entries|length > 3 %}
-                        <span class="block text-[10px] text-slate-500 px-1">+{{ entries|length|add:"-3" }} more</span>
-                        {% endif %}
+                        {% for task in day_tasks|slice:":2" %}
+                        <span class="block text-xs truncate rounded px-1 py-0.5 bg-violet-100 text-violet-800" title="Planning task">
+                            {% if task.assignee_type == 'human' or task.assigned_human %}👤{% else %}🤖{% endif %} {{ task.title }}
+                        </span>
+                        {% endfor %}
                     </div>
                     {% endif %}
                 </a>

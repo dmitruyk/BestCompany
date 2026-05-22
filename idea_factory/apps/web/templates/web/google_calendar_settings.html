@@ -11,7 +11,7 @@
         all-day events with popup reminders (for example, 1 hour and 1 day before the action date).
     </p>
 
-    {% guide_hint title="What gets synced" body="Any action you schedule on a company calendar — from director discussions, manual + Add Action, or autonomous scheduling — appears on your Google Calendar if sync is enabled. Updates to title, date, status, or notes refresh the event." %}
+    {% guide_hint title="What gets synced" body="Calendar actions (scheduled meetings and work items) and open planning tasks with due dates appear on your Google Calendar when sync is enabled. Analyze & optimize schedule moves task due dates and updates the matching Google events automatically." %}
 
     {% if not configured %}
     <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="alert">
@@ -39,6 +39,15 @@
         </a>
         {% endif %}
         {% if connected %}
+        <form method="post" action="{% url 'google_calendar_sync_existing' %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="btn-secondary"
+                {% if not sync_enabled %}disabled aria-disabled="true"{% endif %}
+                aria-label="Sync all existing company calendar actions to Google Calendar"
+                title="{% if not sync_enabled %}Enable sync first{% else %}Create or update Google events for all calendar actions on your companies{% endif %}">
+                Sync existing events
+            </button>
+        </form>
         <form method="post" action="{% url 'google_calendar_disconnect' %}" class="inline"
             onsubmit="return confirm('Disconnect Google Calendar? Existing synced events stay in Google but will no longer update.');">
             {% csrf_token %}
@@ -85,6 +94,7 @@
             <li>Open <strong>Google Calendar</strong> in the top navigation (this page).</li>
             <li>Click <strong>Connect Google Calendar</strong> and approve access for calendar events.</li>
             <li>Enable sync and set reminders (for example <code class="bg-slate-100 px-1 rounded">60,1440</code>).</li>
+            <li>Use <strong>Sync existing events</strong> to push actions that were scheduled before you connected.</li>
             <li>Schedule actions on any company calendar — they appear in Google Calendar with reminders.</li>
         </ol>
 

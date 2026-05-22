@@ -246,6 +246,35 @@ class ExecutionOutput(BaseModel):
     )
 
 
+class ScheduleTaskMove(BaseModel):
+    """One task due-date change from schedule optimization."""
+
+    task_index: int = Field(
+        ge=1,
+        description="1-based index of the task in the schedulable list provided to the optimizer",
+    )
+    new_target_date: str = Field(
+        description="New due date in YYYY-MM-DD format",
+    )
+    reason: str = Field(
+        default="",
+        description="Brief reason for this move (gap closure, dependency, assignee rules)",
+    )
+
+
+class ScheduleOptimizationOutput(BaseModel):
+    """Output from schedule optimizer — redistribute task due dates."""
+
+    summary: str = Field(
+        default="",
+        description="Overall assessment of gaps and what was improved",
+    )
+    moves: list[ScheduleTaskMove] = Field(
+        default_factory=list,
+        description="New due dates for tasks that should move",
+    )
+
+
 class ResultCheckOutput(BaseModel):
     """Output from checker agent - evaluation of completed action."""
 

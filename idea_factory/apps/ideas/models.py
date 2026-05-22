@@ -612,6 +612,17 @@ class CompanyTask(models.Model):
         help_text="Agent could not complete; reassigned or needs human.",
     )
     target_date = models.DateField(null=True, blank=True)
+    google_event_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Google Calendar event ID when synced for the company owner.",
+    )
+    google_calendar_synced_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last successful sync to Google Calendar.",
+    )
     calendar_action = models.ForeignKey(
         CompanyCalendarAction,
         on_delete=models.SET_NULL,

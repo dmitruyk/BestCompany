@@ -31,4 +31,21 @@ def _register_calendar_sync_signal() -> None:
         sync_entry_to_google_calendar(instance)
 
 
+def _register_task_sync_signal() -> None:
+    from apps.ideas.models import CompanyTask
+
+    @receiver(post_save, sender=CompanyTask)
+    def sync_company_task_to_google(
+        sender, instance, created, update_fields=None, **kwargs
+    ) -> None:
+        if update_fields is not None:
+            skip_only = {"google_event_id", "google_calendar_synced_at", "updated_at"}
+            if set(update_fields) <= skip_only:
+                return
+        from apps.core.google_calendar import sync_task_to_google_calendar
+
+        sync_task_to_google_calendar(instance)
+
+
 _register_calendar_sync_signal()
+_register_task_sync_signal()

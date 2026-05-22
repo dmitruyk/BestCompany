@@ -15,8 +15,11 @@ When an action is created or updated (date, title, description, status, completi
 1. Sign in with the account that **owns** the company.
 2. Click **Google Calendar** in the top navigation.
 3. Click **Connect Google Calendar** and approve calendar access.
-4. Enable **sync** and set **reminders** (minutes before the action date), e.g. `60,1440` for 1 hour and 1 day.
-5. Schedule actions on any company calendar — they appear in Google Calendar.
+4. On connect (or when you turn **Enable sync** on), all existing **calendar actions** for your companies are pushed to Google in one batch. Use **Sync existing events** anytime to run that backfill again.
+5. Enable **sync** and set **reminders** (minutes before the action date), e.g. `60,1440` for 1 hour and 1 day.
+6. Schedule actions on any company calendar — they appear in Google Calendar.
+
+**Note:** Violet **planning tasks** with a due date sync as separate Google events (prefixed with 📋). Tasks linked to a calendar action sync only via that action. **Analyze & optimize schedule** moves task due dates and updates Google Calendar for each moved task.
 
 To pause sync without revoking Google access, uncheck **Enable sync** and save.
 
@@ -84,6 +87,8 @@ Rebuild and redeploy the image after adding env vars and committing migrations (
 | Redirect URI mismatch | Redirect URI in Google Console must match `https://HOST/settings/google-calendar/callback/` exactly |
 | Access blocked (testing) | Add user's Google account under OAuth consent → Test users |
 | Events not appearing | Owner must connect Google Calendar and enable sync; check application logs |
+| Old actions missing in Google | Reconnect or toggle **Enable sync** off/on to run backfill; or edit/save the action |
+| Optimize did not move Google events | Enable sync and connect Google; tasks need a **due date**; run **Sync existing events** once after deploy |
 | Reminders wrong | User settings → reminder minutes (comma-separated) |
 
 ## Related code

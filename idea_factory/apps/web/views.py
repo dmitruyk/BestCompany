@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -21,10 +22,16 @@ from apps.core.access import (
     ideas_queryset_for_user,
     user_can_create_companies,
     user_can_create_ideas,
+    user_can_manage_company,
 )
 from apps.ideas.attachments import save_idea_attachments
 from apps.ideas.context import build_idea_request_prompt
 from apps.ideas.autonomous_loop import count_unscheduled_selected, process_company
+from apps.ideas.schedule_optimizer import (
+    count_schedulable_tasks,
+    optimize_company_schedule,
+    tasks_by_date_for_month,
+)
 from apps.web.company_workspace import build_company_workspace_context
 from apps.ideas.models import (
     ActionProposal,
@@ -911,6 +918,8 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
     next_year = year if month < 12 else year + 1
     is_current_month = year == today.year and month == today.month
     can_go_today = today >= start_date
+    tasks_by_date = tasks_by_date_for_month(company, first, last)
+    schedulable_count = count_schedulable_tasks(company)
     ctx = build_company_workspace_context(company, active_tab="calendar")
     ctx.update(
         {
@@ -919,6 +928,7 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
             "month_name": cal_module.month_name[month],
             "weeks": weeks,
             "actions_by_date": actions_by_date,
+            "tasks_by_date": tasks_by_date,
             "start_date": start_date,
             "today": today,
             "is_current_month": is_current_month,
@@ -928,9 +938,38 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
             "next_year": next_year,
             "next_month": next_month,
             "has_prev": has_prev,
+            "can_manage_company": user_can_manage_company(request.user, company),
+            "schedulable_task_count": schedulable_count,
         }
     )
     return render(request, "web/company_calendar.html", ctx)
+
+
+@login_required
+@require_POST
+def company_calendar_optimize(request: HttpRequest, company_pk: str) -> HttpResponse:
+    """Analyze task due dates with LLM and redistribute to close large gaps."""
+    company = get_company_for_user(request.user, company_pk)
+    if not user_can_manage_company(request.user, company):
+        messages.error(request, "Only the company owner can optimize the schedule.")
+        return redirect("company_calendar", company_pk=company_pk)
+
+    result = optimize_company_schedule(company)
+    if not result.ok:
+        messages.error(request, result.error or "Schedule optimization failed.")
+    elif result.tasks_moved == 0:
+        messages.info(request, result.summary or "No task dates were changed.")
+    else:
+        messages.success(
+            request,
+            f"{result.summary} ({result.tasks_moved} task{'s' if result.tasks_moved != 1 else ''} updated.)",
+        )
+    year = request.POST.get("year") or request.GET.get("year")
+    month = request.POST.get("month") or request.GET.get("month")
+    url = reverse("company_calendar", kwargs={"company_pk": company_pk})
+    if year and month:
+        url = f"{url}?year={year}&month={month}"
+    return redirect(url)
 
 
 @login_required

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 from urllib.parse import urlencode
@@ -217,6 +218,18 @@ def _get_calendar_service(profile):
     return build("calendar", "v3", credentials=credentials, cache_discovery=False)
 
 
+def _company_task_url(task) -> str:
+    path = reverse(
+        "company_task_detail",
+        kwargs={"company_pk": task.company_id, "task_pk": task.pk},
+    )
+    host = getattr(settings, "DJANGO_PUBLIC_HOST", "").strip()
+    if not host:
+        return path
+    scheme = "https" if not settings.DEBUG else "http"
+    return f"{scheme}://{host}{path}"
+
+
 def _calendar_entry_url(entry) -> str:
     path = reverse(
         "company_calendar_date",
@@ -279,6 +292,119 @@ def build_google_event_body(entry, profile) -> dict[str, Any]:
     }
 
 
+def build_google_task_event_body(task, profile) -> dict[str, Any]:
+    from apps.ideas.models import CompanyTask
+
+    company_name = task.company.name
+    status_label = task.get_status_display()
+    if task.status == CompanyTask.Status.DONE:
+        title_prefix = f"[{company_name}] ✓ 📋 "
+    else:
+        title_prefix = f"[{company_name}] 📋 "
+    summary = f"{title_prefix}{task.title}"
+    if task.assignee_type == CompanyTask.AssigneeType.HUMAN or task.assigned_human_id:
+        assignee = "Human"
+    elif task.assignee_type == CompanyTask.AssigneeType.AGENT or task.assigned_agent_id:
+        assignee = "AI Agent"
+    else:
+        assignee = "Unassigned"
+    description_parts = [
+        f"Company: {company_name}",
+        f"Type: Planning task",
+        f"Status: {status_label}",
+        f"Assignee: {assignee}",
+    ]
+    if task.description:
+        description_parts.append("")
+        description_parts.append(task.description)
+    if task.result_summary:
+        description_parts.append("")
+        description_parts.append(f"Result:\n{task.result_summary}")
+    description_parts.append("")
+    description_parts.append(f"View in Idea Factory: {_company_task_url(task)}")
+
+    reminders = [
+        {"method": "popup", "minutes": minutes}
+        for minutes in profile_reminder_minutes(profile)
+    ]
+    due: date = task.target_date
+    return {
+        "summary": summary[:1024],
+        "description": "\n".join(description_parts)[:8000],
+        "start": {"date": due.isoformat()},
+        "end": {"date": (due + timedelta(days=1)).isoformat()},
+        "reminders": {
+            "useDefault": False,
+            "overrides": reminders,
+        },
+        "extendedProperties": {
+            "private": {
+                "idea_factory_task_id": str(task.pk),
+                "idea_factory_company_id": str(task.company_id),
+            }
+        },
+    }
+
+
+def _task_should_sync_to_google(task) -> bool:
+    from apps.ideas.models import CompanyTask
+
+    if not task.target_date:
+        return False
+    if task.status == CompanyTask.Status.CANCELLED:
+        return False
+    if task.calendar_action_id:
+        return False
+    return True
+
+
+def sync_task_to_google_calendar(task) -> bool:
+    """Create or update a Google Calendar event for a planning task. Returns True on success."""
+    from apps.ideas.models import CompanyTask
+
+    if not is_google_calendar_configured() or not _task_should_sync_to_google(task):
+        return False
+
+    owner = task.company.owner
+    profile = getattr(owner, "profile", None)
+    if profile is None:
+        return False
+    if not profile.google_calendar_sync_enabled or not profile_has_google_credentials(profile):
+        return False
+
+    service = _get_calendar_service(profile)
+    if service is None:
+        return False
+
+    calendar_id = profile.google_calendar_id or "primary"
+    body = build_google_task_event_body(task, profile)
+
+    try:
+        if task.google_event_id:
+            service.events().update(
+                calendarId=calendar_id,
+                eventId=task.google_event_id,
+                body=body,
+            ).execute()
+            CompanyTask.objects.filter(pk=task.pk).update(
+                google_calendar_synced_at=timezone.now(),
+            )
+        else:
+            created = service.events().insert(calendarId=calendar_id, body=body).execute()
+            event_id = created.get("id", "")
+            if event_id:
+                CompanyTask.objects.filter(pk=task.pk).update(
+                    google_event_id=event_id,
+                    google_calendar_synced_at=timezone.now(),
+                )
+                task.google_event_id = event_id
+        logger.info("Synced planning task %s to Google Calendar", task.pk)
+        return True
+    except Exception:
+        logger.exception("Failed to sync planning task %s to Google Calendar", task.pk)
+        return False
+
+
 def sync_entry_to_google_calendar(entry) -> bool:
     """Create or update a Google Calendar event for a calendar action. Returns True on success."""
     from apps.ideas.models import CompanyCalendarAction
@@ -307,6 +433,9 @@ def sync_entry_to_google_calendar(entry) -> bool:
                 eventId=entry.google_event_id,
                 body=body,
             ).execute()
+            CompanyCalendarAction.objects.filter(pk=entry.pk).update(
+                google_calendar_synced_at=timezone.now(),
+            )
         else:
             created = service.events().insert(calendarId=calendar_id, body=body).execute()
             event_id = created.get("id", "")
@@ -338,6 +467,123 @@ def delete_google_calendar_event(entry) -> None:
         service.events().delete(calendarId=calendar_id, eventId=entry.google_event_id).execute()
     except Exception:
         logger.exception("Failed to delete Google event %s", entry.google_event_id)
+
+
+@dataclass
+class GoogleCalendarBulkSyncResult:
+    synced: int = 0
+    failed: int = 0
+    skipped: int = 0
+
+
+def _owner_profile_for_sync(user):
+    profile = getattr(user, "profile", None)
+    if profile is None:
+        return None
+    if not profile.google_calendar_sync_enabled or not profile_has_google_credentials(profile):
+        return None
+    if not is_google_calendar_configured():
+        return None
+    return profile
+
+
+def sync_all_owner_calendar_actions(user) -> GoogleCalendarBulkSyncResult:
+    """Push calendar actions and planning tasks for companies this user owns."""
+    from apps.ideas.models import CompanyCalendarAction, CompanyTask
+
+    result = GoogleCalendarBulkSyncResult()
+    action_count = CompanyCalendarAction.objects.filter(company__owner=user).count()
+    task_count = CompanyTask.objects.filter(
+        company__owner=user,
+        target_date__isnull=False,
+        calendar_action__isnull=True,
+    ).exclude(status=CompanyTask.Status.CANCELLED).count()
+    if _owner_profile_for_sync(user) is None:
+        result.skipped = action_count + task_count
+        return result
+
+    entries = (
+        CompanyCalendarAction.objects.filter(company__owner=user)
+        .select_related("company")
+        .order_by("action_date", "title")
+    )
+    for entry in entries:
+        if sync_entry_to_google_calendar(entry):
+            result.synced += 1
+        else:
+            result.failed += 1
+
+    tasks = (
+        CompanyTask.objects.filter(
+            company__owner=user,
+            target_date__isnull=False,
+            calendar_action__isnull=True,
+        )
+        .exclude(status=CompanyTask.Status.CANCELLED)
+        .select_related("company", "assigned_agent", "assigned_human")
+        .order_by("target_date", "title")
+    )
+    for task in tasks:
+        if sync_task_to_google_calendar(task):
+            result.synced += 1
+        else:
+            result.failed += 1
+    return result
+
+
+def sync_company_calendar_actions(company) -> GoogleCalendarBulkSyncResult:
+    """Re-sync calendar actions and planning tasks for one company."""
+    from apps.ideas.models import CompanyTask
+
+    result = GoogleCalendarBulkSyncResult()
+    owner = company.owner
+    task_qs = company.tasks.filter(
+        target_date__isnull=False,
+        calendar_action__isnull=True,
+    ).exclude(status=CompanyTask.Status.CANCELLED)
+    if _owner_profile_for_sync(owner) is None:
+        result.skipped = company.calendar_actions.count() + task_qs.count()
+        return result
+
+    entries = company.calendar_actions.select_related("company").order_by(
+        "action_date", "title"
+    )
+    for entry in entries:
+        if sync_entry_to_google_calendar(entry):
+            result.synced += 1
+        else:
+            result.failed += 1
+
+    for task in task_qs.select_related(
+        "company", "assigned_agent", "assigned_human"
+    ).order_by("target_date", "title"):
+        if sync_task_to_google_calendar(task):
+            result.synced += 1
+        else:
+            result.failed += 1
+    return result
+
+
+def align_calendar_actions_with_task_dates(
+    tasks: list, final_dates: dict
+) -> int:
+    """Move linked calendar actions when schedule optimization changes task due dates."""
+    from apps.ideas.models import CompanyCalendarAction
+
+    moved = 0
+    for task in tasks:
+        new_date = final_dates.get(task.pk)
+        if not new_date:
+            continue
+        action = getattr(task, "calendar_action", None)
+        if action is None:
+            continue
+        if action.action_date == new_date:
+            continue
+        action.action_date = new_date
+        action.save(update_fields=["action_date", "updated_at"])
+        moved += 1
+    return moved
 
 
 def _callback_redirect_uri(request) -> str:

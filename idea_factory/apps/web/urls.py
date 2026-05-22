@@ -41,6 +41,11 @@ urlpatterns = [
         google_calendar_views.google_calendar_disconnect,
         name="google_calendar_disconnect",
     ),
+    path(
+        "settings/google-calendar/sync-existing/",
+        google_calendar_views.google_calendar_sync_existing,
+        name="google_calendar_sync_existing",
+    ),
     path("settings/users/", user_views.user_list, name="user_list"),
     path("settings/users/new/", user_views.user_create, name="user_create"),
     path("settings/users/<int:user_id>/edit/", user_views.user_edit, name="user_edit"),
@@ -80,6 +85,11 @@ urlpatterns = [
     path("companies/<uuid:company_pk>/actions/<uuid:action_pk>/schedule/", views.action_schedule, name="action_schedule"),
     path("companies/<uuid:company_pk>/actions/<uuid:action_pk>/reject/", views.action_reject, name="action_reject"),
     path("companies/<uuid:company_pk>/calendar/", views.company_calendar, name="company_calendar"),
+    path(
+        "companies/<uuid:company_pk>/calendar/optimize/",
+        views.company_calendar_optimize,
+        name="company_calendar_optimize",
+    ),
     path("companies/<uuid:company_pk>/calendar/add/", views.calendar_action_add, name="calendar_action_add"),
     path("companies/<uuid:company_pk>/calendar/<int:year>/<int:month>/<int:day>/", views.company_calendar_date, name="company_calendar_date"),
     path("companies/<uuid:company_pk>/calendar/entry/<uuid:entry_pk>/status/", views.calendar_action_update_status, name="calendar_action_update_status"),
