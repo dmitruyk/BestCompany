@@ -15,6 +15,9 @@ class MustChangePasswordMiddleware:
         "/admin/",
         "/static/",
         "/media/",
+        "/favicon.ico",
+        "/favicon.svg",
+        "/apple-touch-icon.png",
     )
 
     def __init__(self, get_response):

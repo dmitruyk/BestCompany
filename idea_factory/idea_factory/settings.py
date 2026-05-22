@@ -73,6 +73,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -129,10 +130,19 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# Static files
-STATIC_URL = "static/"
+# Static files (WhiteNoise serves STATIC_ROOT in production via gunicorn)
+STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "apps" / "web" / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
+# Favicons are served by apps.web.favicon_views from apps/web/static/ (see urls.py).
 
 # Uploaded files (PDF attachments on ideas)
 MEDIA_URL = "/media/"

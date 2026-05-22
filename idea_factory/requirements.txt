@@ -18,6 +18,7 @@ ddgs>=9.0
 
 # Production WSGI server (Docker)
 gunicorn>=22.0
+whitenoise>=6.6
 
 # Testing
 pytest>=7.0
