@@ -47,7 +47,9 @@ class Command(BaseCommand):
                 )
             return
 
-        result = run_task_execution_for_company(company, max_tasks=max_tasks)
+        result = run_task_execution_for_company(
+            company, max_tasks=max_tasks, manual_trigger=True
+        )
         self.stdout.write(
             self.style.SUCCESS(
                 f"Done: {result.tasks_completed} completed, "

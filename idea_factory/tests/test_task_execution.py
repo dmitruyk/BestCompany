@@ -13,9 +13,11 @@ from apps.ideas.models import (
 )
 from apps.ideas.task_execution import (
     execute_company_task,
+    explain_task_skip,
     get_runnable_tasks,
     is_task_runnable,
     run_company_task_execution,
+    sync_task_target_date_to_run_day,
 )
 
 
@@ -47,9 +49,8 @@ def test_is_task_runnable_respects_dependencies(company, full_agent_fleet):
 
 
 @pytest.mark.django_db
-def test_is_task_runnable_future_target_date(company, full_agent_fleet, monkeypatch):
+def test_is_task_runnable_ignores_future_target_date(company, full_agent_fleet):
     del full_agent_fleet
-    monkeypatch.setenv("TICKER_TASK_DUE_LOOKAHEAD_DAYS", "0")
     agent = company.agents.first()
     today = timezone.localdate()
     task = CompanyTask.objects.create(
@@ -58,28 +59,55 @@ def test_is_task_runnable_future_target_date(company, full_agent_fleet, monkeypa
         status=CompanyTask.Status.TODO,
         assignee_type=CompanyTask.AssigneeType.AGENT,
         assigned_agent=agent,
-        target_date=today + timedelta(days=5),
+        target_date=today + timedelta(days=30),
     )
-    assert is_task_runnable(task) is False
-    task.target_date = today
-    task.save()
     assert is_task_runnable(task) is True
+    assert "eligible" in explain_task_skip(task)
 
 
 @pytest.mark.django_db
-def test_is_task_runnable_within_lookahead(company, full_agent_fleet):
+def test_sync_task_target_date_to_run_day(company, full_agent_fleet):
     del full_agent_fleet
     agent = company.agents.first()
     today = timezone.localdate()
     task = CompanyTask.objects.create(
         company=company,
-        title="This week",
+        title="Planned later",
         status=CompanyTask.Status.TODO,
         assignee_type=CompanyTask.AssigneeType.AGENT,
         assigned_agent=agent,
-        target_date=today + timedelta(days=5),
+        target_date=today + timedelta(days=30),
     )
-    assert is_task_runnable(task) is True
+    assert sync_task_target_date_to_run_day(task, today=today) is True
+    assert task.target_date == today
+    assert sync_task_target_date_to_run_day(task, today=today) is False
+
+
+@pytest.mark.django_db
+def test_execute_company_task_updates_target_date(company, full_agent_fleet):
+    del full_agent_fleet
+    agent = company.agents.filter(role=CompanyAgent.Role.PLANNER).first()
+    today = timezone.localdate()
+    task = CompanyTask.objects.create(
+        company=company,
+        title="Future due",
+        status=CompanyTask.Status.TODO,
+        assignee_type=CompanyTask.AssigneeType.AGENT,
+        assigned_agent=agent,
+        target_date=today + timedelta(days=14),
+    )
+    mock_out = MagicMock(
+        result_summary="Done.",
+        progress_percent=100,
+        outcome_assessment="success",
+        needs_human=False,
+    )
+    with patch("apps.agents.agents._run_agent", return_value=(mock_out, None)), patch(
+        "apps.agents.providers.validate_provider_config", return_value=None
+    ), patch("apps.agents.providers.get_model_for_idea", return_value=MagicMock()):
+        execute_company_task(task, manual_trigger=True)
+    task.refresh_from_db()
+    assert task.target_date == today
 
 
 @pytest.mark.django_db

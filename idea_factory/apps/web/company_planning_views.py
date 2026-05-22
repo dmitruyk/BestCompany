@@ -79,14 +79,16 @@ def company_tasks_run_now(request: HttpRequest, company_pk: str) -> HttpResponse
         messages.warning(
             request,
             "No agent tasks are ready. Tasks must be To Do, assigned to an AI agent, "
-            "not blocked by dependencies, and due within the lookahead window. "
+            "and not blocked by dependencies. "
             "Human-assigned tasks must be completed manually.",
         )
         return redirect("company_tasks", company_pk=company_pk)
 
     max_tasks = min(10, max(1, len(runnable)))
     try:
-        result = run_task_execution_for_company(company, max_tasks=max_tasks)
+        result = run_task_execution_for_company(
+            company, max_tasks=max_tasks, manual_trigger=True
+        )
     except Exception:
         logger.exception("Manual task execution failed for company %s", company.pk)
         messages.error(

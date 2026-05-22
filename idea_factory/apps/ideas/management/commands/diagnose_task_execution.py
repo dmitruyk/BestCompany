@@ -3,11 +3,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.ideas.models import Company, CompanyTask
-from apps.ideas.task_execution import (
-    explain_task_skip,
-    get_runnable_tasks,
-    task_due_cutoff,
-)
+from apps.ideas.task_execution import explain_task_skip, get_runnable_tasks
 
 
 class Command(BaseCommand):
@@ -23,8 +19,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         today = timezone.localdate()
-        cutoff = task_due_cutoff(today=today)
-        self.stdout.write(f"Today: {today}  |  Run tasks with target_date ≤ {cutoff}\n")
+        self.stdout.write(
+            f"Today: {today}  |  Runnable: To Do, AI-assigned, not blocked (due date ignored)\n"
+        )
 
         companies = Company.objects.filter(status=Company.Status.ACTIVE).order_by("name")
         if options["company"]:
@@ -36,7 +33,7 @@ class Command(BaseCommand):
 
         for company in companies:
             self.stdout.write(self.style.MIGRATE_HEADING(f"\n{company.name} ({company.pk})"))
-            runnable = get_runnable_tasks(company, limit=20, today=today)
+            runnable = get_runnable_tasks(company, limit=20)
             self.stdout.write(
                 self.style.SUCCESS(f"  Runnable now: {len(runnable)} task(s)")
             )
@@ -62,7 +59,7 @@ class Command(BaseCommand):
                         else "—"
                     )
                 )
-                reason = explain_task_skip(task, today=today)
+                reason = explain_task_skip(task)
                 self.stdout.write(
                     f"    ✗ {task.title[:50]} [{task.get_status_display()}] "
                     f"{task.get_assignee_type_display()} / {agent} / due={task.target_date or '—'}"

@@ -80,7 +80,7 @@ Companies use structured planning separate from the calendar:
 
 1. Activity checks (overdue tasks, stale planning sessions)
 2. `run_autonomous_loop` for Self-Run companies
-3. **Automatic task execution** (`run_company_task_execution`): for each ACTIVE company, up to `TICKER_TASK_MAX_PER_COMPANY` agent-assigned `TODO` tasks that are not blocked by dependencies and due within `TICKER_TASK_DUE_LOOKAHEAD_DAYS`. Sets `IN_PROGRESS`, runs the assigned agent’s LLM, then `DONE` (with `result_summary`) or escalates to human if `needs_human`.
+3. **Automatic task execution** (`run_company_task_execution`): for each ACTIVE company, up to `TICKER_TASK_MAX_PER_COMPANY` agent-assigned `TODO` tasks that are not blocked by dependencies. On start, `target_date` is set to today (manual **Run agent tasks now** uses the same rule). Sets `IN_PROGRESS`, runs the assigned agent’s LLM, then `DONE` (with `result_summary`) or escalates to human if `needs_human`.
 4. `run_weekly_planning` on Mondays after `TICKER_WEEKLY_PLANNING_HOUR`
 
 **Manual task run:** Tasks board → **Run agent tasks now**, or `python manage.py run_company_tasks <company_uuid>` (up to 10 tasks per run).
