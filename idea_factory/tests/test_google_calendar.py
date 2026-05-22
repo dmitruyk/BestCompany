@@ -194,3 +194,75 @@ def test_sync_task_updates_google_event(company) -> None:
 
     task.refresh_from_db()
     assert task.google_event_id == "task-evt-1"
+
+
+@pytest.mark.django_db
+@override_settings(
+    GOOGLE_CALENDAR_CLIENT_ID="id",
+    GOOGLE_CALENDAR_CLIENT_SECRET="secret",
+    GOOGLE_CALENDAR_PORTAL_NAME="Idea Factory",
+)
+def test_ensure_portal_calendar_creates_calendar(company) -> None:
+    profile = company.owner.profile
+    profile.google_calendar_refresh_token = encrypt_token("refresh")
+    profile.google_calendar_access_token = encrypt_token("access")
+    profile.google_calendar_id = ""
+    profile.save()
+
+    mock_service = MagicMock()
+    mock_service.calendarList.return_value.list.return_value.execute.return_value = {
+        "items": []
+    }
+    mock_service.calendars.return_value.insert.return_value.execute.return_value = {
+        "id": "portal-cal-id"
+    }
+
+    with patch(
+        "apps.core.google_calendar._get_calendar_service", return_value=mock_service
+    ), patch(
+        "apps.core.google_calendar._get_valid_access_token", return_value="access"
+    ):
+        from apps.core.google_calendar import ensure_portal_calendar
+
+        cal_id = ensure_portal_calendar(profile)
+
+    assert cal_id == "portal-cal-id"
+    profile.refresh_from_db()
+    assert profile.google_calendar_id == "portal-cal-id"
+
+
+@pytest.mark.django_db
+@override_settings(
+    GOOGLE_CALENDAR_CLIENT_ID="id",
+    GOOGLE_CALENDAR_CLIENT_SECRET="secret",
+)
+def test_remove_all_owner_google_events(company) -> None:
+    profile = company.owner.profile
+    profile.google_calendar_refresh_token = encrypt_token("refresh")
+    profile.google_calendar_access_token = encrypt_token("access")
+    profile.save()
+
+    entry = CompanyCalendarAction.objects.create(
+        company=company,
+        action_date=date.today(),
+        title="To remove",
+        google_event_id="evt-del-1",
+    )
+
+    mock_service = MagicMock()
+    mock_events = MagicMock()
+    mock_service.events.return_value = mock_events
+
+    with patch(
+        "apps.core.google_calendar._get_calendar_service", return_value=mock_service
+    ), patch(
+        "apps.core.google_calendar._get_valid_access_token", return_value="access"
+    ):
+        from apps.core.google_calendar import remove_all_owner_google_events
+
+        result = remove_all_owner_google_events(company.owner)
+
+    assert result.synced == 1
+    mock_events.delete.assert_called_once()
+    entry.refresh_from_db()
+    assert entry.google_event_id == ""

@@ -1,6 +1,6 @@
 # Google Calendar integration
 
-Company calendar actions in Idea Factory can sync to each **company owner's** personal Google Calendar as all-day events with popup reminders.
+Company calendar actions and planning tasks sync to a **dedicated Google Calendar** on each company owner's account (default name: **Idea Factory**, configurable via `GOOGLE_CALENDAR_PORTAL_NAME`). Events do not use the primary calendar unless you override the calendar ID.
 
 ## What syncs
 
@@ -23,6 +23,8 @@ When an action is created or updated (date, title, description, status, completi
 
 To pause sync without revoking Google access, uncheck **Enable sync** and save.
 
+**Disconnect:** **Remove synced events on disconnect** is on by default. When checked, disconnect deletes Idea Factory events from Google and clears stored event IDs. Uncheck it before disconnecting if you want events to remain on Google.
+
 ## Administrator setup (one-time)
 
 ### 1. Google Cloud project
@@ -35,7 +37,7 @@ To pause sync without revoking Google access, uncheck **Enable sync** and save.
 
 1. **APIs & Services** → **OAuth consent screen**.
 2. Choose **External** (or Internal for Workspace-only).
-3. Add scope: `https://www.googleapis.com/auth/calendar.events` (or use the Calendar API scope picker).
+3. Add scope: `https://www.googleapis.com/auth/calendar` (full calendar access — needed to create the dedicated portal calendar and manage events).
 4. Add test users if the app is in **Testing** mode (required until published).
 
 ### 3. OAuth client (Web application)
@@ -59,6 +61,8 @@ GOOGLE_CALENDAR_CLIENT_ID=xxxx.apps.googleusercontent.com
 GOOGLE_CALENDAR_CLIENT_SECRET=xxxx
 # Optional: default reminders for new users (minutes before action date)
 GOOGLE_CALENDAR_DEFAULT_REMINDERS=60,1440
+# Optional: name of the dedicated Google Calendar (created on connect)
+GOOGLE_CALENDAR_PORTAL_NAME=Idea Factory
 ```
 
 Also ensure:
@@ -71,7 +75,9 @@ Restart the application after changing `.env`.
 
 ### 5. Docker / production
 
-Rebuild and redeploy the image after adding env vars and committing migrations (`core.0004`, `ideas.0012`). Migrations run automatically via the container entrypoint.
+Rebuild and redeploy the image after adding env vars and running migrations (`core.0005`, `ideas.0015`, and earlier Google Calendar migrations). Migrations run automatically via the container entrypoint.
+
+After a scope change to full `calendar` access, owners should **disconnect and reconnect** Google Calendar once.
 
 ## Security notes
 

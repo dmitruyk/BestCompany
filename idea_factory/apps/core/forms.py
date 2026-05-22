@@ -387,6 +387,7 @@ class GoogleCalendarSettingsForm(forms.ModelForm):
         model = UserProfile
         fields = (
             "google_calendar_sync_enabled",
+            "google_calendar_remove_events_on_disconnect",
             "google_calendar_id",
             "google_calendar_reminder_minutes",
         )
@@ -394,8 +395,11 @@ class GoogleCalendarSettingsForm(forms.ModelForm):
             "google_calendar_sync_enabled": forms.CheckboxInput(
                 attrs={"class": _CHECKBOX_CLASS}
             ),
+            "google_calendar_remove_events_on_disconnect": forms.CheckboxInput(
+                attrs={"class": _CHECKBOX_CLASS}
+            ),
             "google_calendar_id": forms.TextInput(
-                attrs={"class": _INPUT_CLASS, "placeholder": "primary"}
+                attrs={"class": _INPUT_CLASS, "placeholder": "Auto: dedicated Idea Factory calendar"}
             ),
             "google_calendar_reminder_minutes": forms.TextInput(
                 attrs={"class": _INPUT_CLASS, "placeholder": "60,1440"}

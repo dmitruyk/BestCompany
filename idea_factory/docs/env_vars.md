@@ -23,6 +23,7 @@
 | `GOOGLE_CALENDAR_CLIENT_ID` | (empty) | Google OAuth client ID for calendar sync |
 | `GOOGLE_CALENDAR_CLIENT_SECRET` | (empty) | Google OAuth client secret |
 | `GOOGLE_CALENDAR_DEFAULT_REMINDERS` | `60,1440` | Default reminder offsets in minutes (comma-separated) |
+| `GOOGLE_CALENDAR_PORTAL_NAME` | `Idea Factory` | Display name of the dedicated Google Calendar created on connect |
 | `TICKER_ENABLED` | `true` | Set `false` to disable background ticker |
 | `TICKER_INTERVAL_SECONDS` | `3600` | Seconds between ticks in Docker `idea-factory-ticker` |
 | `TICKER_WEEKLY_PLANNING` | `true` | Run `run_weekly_planning` on Mondays from ticker |

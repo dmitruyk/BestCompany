@@ -31,8 +31,12 @@ class UserProfile(models.Model):
     google_calendar_id = models.CharField(
         max_length=255,
         blank=True,
-        default="primary",
-        help_text="Google Calendar ID (usually 'primary' for the user's main calendar).",
+        default="",
+        help_text="Google Calendar ID; leave empty to use the dedicated Idea Factory calendar.",
+    )
+    google_calendar_remove_events_on_disconnect = models.BooleanField(
+        default=True,
+        help_text="When True, disconnecting removes Idea Factory events from Google Calendar.",
     )
     google_calendar_reminder_minutes = models.CharField(
         max_length=120,

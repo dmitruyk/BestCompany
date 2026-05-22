@@ -9,6 +9,8 @@ from apps.core.forms import GoogleCalendarSettingsForm
 from apps.core.google_calendar import (
     build_oauth_authorization_url,
     clear_google_calendar_credentials,
+    portal_calendar_display_name,
+    remove_all_owner_google_events,
     default_reminder_minutes,
     exchange_code_for_tokens,
     is_google_calendar_configured,
@@ -69,6 +71,10 @@ def google_calendar_settings(request: HttpRequest) -> HttpResponse:
             "connected_at": profile.google_calendar_connected_at,
             "default_reminders": default_reminder_minutes(),
             "sync_enabled": profile.google_calendar_sync_enabled,
+            "remove_events_on_disconnect": profile.google_calendar_remove_events_on_disconnect,
+            "portal_calendar_name": portal_calendar_display_name(),
+            "calendar_id_display": (profile.google_calendar_id or "").strip()
+            or f"Auto ({portal_calendar_display_name()})",
         },
     )
 
@@ -173,6 +179,36 @@ def google_calendar_sync_existing(request: HttpRequest) -> HttpResponse:
 @require_POST
 def google_calendar_disconnect(request: HttpRequest) -> HttpResponse:
     profile = _get_profile(request.user)
-    clear_google_calendar_credentials(profile)
-    messages.success(request, "Google Calendar disconnected.")
+    if (
+        profile.google_calendar_remove_events_on_disconnect
+        and profile_has_google_credentials(profile)
+    ):
+        bulk = remove_all_owner_google_events(request.user)
+        clear_google_calendar_credentials(profile)
+        if bulk.synced and bulk.failed:
+            messages.warning(
+                request,
+                f"Google Calendar disconnected. Removed {bulk.synced} synced event"
+                f"{'s' if bulk.synced != 1 else ''} from Google; {bulk.failed} could not be deleted.",
+            )
+        elif bulk.synced:
+            messages.success(
+                request,
+                f"Google Calendar disconnected and {bulk.synced} synced event"
+                f"{'s' if bulk.synced != 1 else ''} removed from Google.",
+            )
+        elif bulk.failed:
+            messages.warning(
+                request,
+                "Google Calendar disconnected, but some synced events could not be "
+                "removed from Google. Delete them manually if needed.",
+            )
+        else:
+            messages.success(request, "Google Calendar disconnected.")
+    else:
+        clear_google_calendar_credentials(profile)
+        messages.success(
+            request,
+            "Google Calendar disconnected. Synced events were left on your Google Calendar.",
+        )
     return redirect("google_calendar_settings")

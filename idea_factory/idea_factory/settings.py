@@ -163,6 +163,10 @@ GOOGLE_CALENDAR_CLIENT_SECRET = os.environ.get("GOOGLE_CALENDAR_CLIENT_SECRET", 
 GOOGLE_CALENDAR_DEFAULT_REMINDERS = os.environ.get(
     "GOOGLE_CALENDAR_DEFAULT_REMINDERS", "60,1440"
 )
+# Dedicated Google Calendar name (created on connect; keeps events off the primary calendar)
+GOOGLE_CALENDAR_PORTAL_NAME = (
+    os.environ.get("GOOGLE_CALENDAR_PORTAL_NAME", "Idea Factory").strip() or "Idea Factory"
+)
 
 # Logging - write to file (IDEA_FACTORY_LOG_FILE env overrides path)
 LOG_DIR = BASE_DIR / "logs"

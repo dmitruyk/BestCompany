@@ -14,8 +14,19 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar"
 _TOKEN_SALT = "google-calendar-token-v1"
+
+
+def portal_calendar_display_name() -> str:
+    return getattr(settings, "GOOGLE_CALENDAR_PORTAL_NAME", "Idea Factory") or "Idea Factory"
+
+
+@dataclass
+class GoogleCalendarBulkSyncResult:
+    synced: int = 0
+    failed: int = 0
+    skipped: int = 0
 
 
 def is_google_calendar_configured() -> bool:
@@ -171,6 +182,65 @@ def save_tokens_to_profile(profile, token_payload: dict[str, Any]) -> None:
             "updated_at",
         ]
     )
+    ensure_portal_calendar(profile)
+
+
+def calendar_id_for_profile(profile) -> str:
+    """Calendar used for sync; falls back to primary only if portal setup failed."""
+    calendar_id = (profile.google_calendar_id or "").strip()
+    if calendar_id and calendar_id.lower() != "primary":
+        return calendar_id
+    return calendar_id or "primary"
+
+
+def ensure_portal_calendar(profile) -> str | None:
+    """
+    Find or create a dedicated Google Calendar (portal name) so events do not use primary.
+    No-op when the user set a custom calendar ID.
+    """
+    custom = (profile.google_calendar_id or "").strip()
+    if custom and custom.lower() != "primary":
+        return custom
+
+    service = _get_calendar_service(profile)
+    if service is None:
+        return None
+
+    portal_name = portal_calendar_display_name()
+    page_token: str | None = None
+    try:
+        while True:
+            result = (
+                service.calendarList()
+                .list(pageToken=page_token, minAccessRole="owner")
+                .execute()
+            )
+            for item in result.get("items", []):
+                if item.get("summary") == portal_name:
+                    calendar_id = item["id"]
+                    profile.google_calendar_id = calendar_id
+                    profile.save(update_fields=["google_calendar_id", "updated_at"])
+                    logger.info("Using existing Google portal calendar %s", calendar_id)
+                    return calendar_id
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
+
+        created = (
+            service.calendars()
+            .insert(body={"summary": portal_name, "timeZone": settings.TIME_ZONE})
+            .execute()
+        )
+        calendar_id = created.get("id", "")
+        if not calendar_id:
+            return None
+        profile.google_calendar_id = calendar_id
+        profile.save(update_fields=["google_calendar_id", "updated_at"])
+        logger.info("Created Google portal calendar %s (%s)", portal_name, calendar_id)
+        return calendar_id
+    except Exception:
+        logger.exception("Failed to ensure portal calendar %s", portal_name)
+        return None
 
 
 def clear_google_calendar_credentials(profile) -> None:
@@ -376,7 +446,7 @@ def sync_task_to_google_calendar(task) -> bool:
     if service is None:
         return False
 
-    calendar_id = profile.google_calendar_id or "primary"
+    calendar_id = calendar_id_for_profile(profile)
     body = build_google_task_event_body(task, profile)
 
     try:
@@ -423,7 +493,7 @@ def sync_entry_to_google_calendar(entry) -> bool:
     if service is None:
         return False
 
-    calendar_id = profile.google_calendar_id or "primary"
+    calendar_id = calendar_id_for_profile(profile)
     body = build_google_event_body(entry, profile)
 
     try:
@@ -452,28 +522,80 @@ def sync_entry_to_google_calendar(entry) -> bool:
         return False
 
 
-def delete_google_calendar_event(entry) -> None:
-    if not entry.google_event_id or not is_google_calendar_configured():
-        return
-    owner = entry.company.owner
-    profile = getattr(owner, "profile", None)
-    if profile is None or not profile_has_google_credentials(profile):
-        return
+def _delete_google_event(profile, event_id: str) -> bool:
+    if not event_id or not is_google_calendar_configured():
+        return False
+    if not profile_has_google_credentials(profile):
+        return False
     service = _get_calendar_service(profile)
     if service is None:
-        return
-    calendar_id = profile.google_calendar_id or "primary"
+        return False
+    calendar_id = calendar_id_for_profile(profile)
     try:
-        service.events().delete(calendarId=calendar_id, eventId=entry.google_event_id).execute()
+        service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
+        return True
     except Exception:
-        logger.exception("Failed to delete Google event %s", entry.google_event_id)
+        logger.exception("Failed to delete Google event %s", event_id)
+        return False
 
 
-@dataclass
-class GoogleCalendarBulkSyncResult:
-    synced: int = 0
-    failed: int = 0
-    skipped: int = 0
+def delete_google_calendar_event(entry) -> None:
+    owner = entry.company.owner
+    profile = getattr(owner, "profile", None)
+    if profile is None:
+        return
+    _delete_google_event(profile, entry.google_event_id)
+
+
+def delete_google_task_event(task) -> None:
+    owner = task.company.owner
+    profile = getattr(owner, "profile", None)
+    if profile is None:
+        return
+    _delete_google_event(profile, task.google_event_id)
+
+
+def remove_all_owner_google_events(user) -> GoogleCalendarBulkSyncResult:
+    """Delete synced Google events for all companies owned by user; clear local event IDs."""
+    from apps.ideas.models import CompanyCalendarAction, CompanyTask
+
+    result = GoogleCalendarBulkSyncResult()
+    profile = getattr(user, "profile", None)
+    if profile is None or not profile_has_google_credentials(profile):
+        action_qs = CompanyCalendarAction.objects.filter(company__owner=user).exclude(
+            google_event_id=""
+        )
+        task_qs = CompanyTask.objects.filter(company__owner=user).exclude(
+            google_event_id=""
+        )
+        result.skipped = action_qs.count() + task_qs.count()
+        return result
+
+    for entry in CompanyCalendarAction.objects.filter(company__owner=user).exclude(
+        google_event_id=""
+    ):
+        if _delete_google_event(profile, entry.google_event_id):
+            result.synced += 1
+        else:
+            result.failed += 1
+
+    for task in CompanyTask.objects.filter(company__owner=user).exclude(
+        google_event_id=""
+    ):
+        if _delete_google_event(profile, task.google_event_id):
+            result.synced += 1
+        else:
+            result.failed += 1
+
+    CompanyCalendarAction.objects.filter(company__owner=user).update(
+        google_event_id="",
+        google_calendar_synced_at=None,
+    )
+    CompanyTask.objects.filter(company__owner=user).update(
+        google_event_id="",
+        google_calendar_synced_at=None,
+    )
+    return result
 
 
 def _owner_profile_for_sync(user):
@@ -492,15 +614,17 @@ def sync_all_owner_calendar_actions(user) -> GoogleCalendarBulkSyncResult:
     from apps.ideas.models import CompanyCalendarAction, CompanyTask
 
     result = GoogleCalendarBulkSyncResult()
+    profile = _owner_profile_for_sync(user)
     action_count = CompanyCalendarAction.objects.filter(company__owner=user).count()
     task_count = CompanyTask.objects.filter(
         company__owner=user,
         target_date__isnull=False,
         calendar_action__isnull=True,
     ).exclude(status=CompanyTask.Status.CANCELLED).count()
-    if _owner_profile_for_sync(user) is None:
+    if profile is None:
         result.skipped = action_count + task_count
         return result
+    ensure_portal_calendar(profile)
 
     entries = (
         CompanyCalendarAction.objects.filter(company__owner=user)
@@ -541,9 +665,11 @@ def sync_company_calendar_actions(company) -> GoogleCalendarBulkSyncResult:
         target_date__isnull=False,
         calendar_action__isnull=True,
     ).exclude(status=CompanyTask.Status.CANCELLED)
-    if _owner_profile_for_sync(owner) is None:
+    profile = _owner_profile_for_sync(owner)
+    if profile is None:
         result.skipped = company.calendar_actions.count() + task_qs.count()
         return result
+    ensure_portal_calendar(profile)
 
     entries = company.calendar_actions.select_related("company").order_by(
         "action_date", "title"
