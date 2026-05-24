@@ -102,6 +102,36 @@ def get_llm_settings_for_idea(idea_request) -> LLMSettings:
     )
 
 
+def get_llm_settings_for_assistant(idea_request=None) -> LLMSettings:
+    """
+    LLM settings for the company Assistant tab (staff-configured in LLM settings / admin).
+
+    Uses ServiceLLMConfig assistant_* fields when set; does not use per-idea overrides.
+    idea_request is accepted for API compatibility but ignored.
+    """
+    del idea_request
+    base = get_service_llm_settings()
+    from apps.core.models import ServiceLLMConfig
+
+    cfg = ServiceLLMConfig.load()
+    provider = normalize_provider(cfg.assistant_provider or cfg.default_provider)
+    if provider == PROVIDER_OPENAI:
+        openai_model = cfg.assistant_openai_model_id or cfg.openai_model_id
+        return LLMSettings(
+            provider=provider,
+            ollama_host=base.ollama_host,
+            ollama_model_id=base.ollama_model_id,
+            openai_model_id=openai_model,
+        )
+    ollama_model = cfg.assistant_ollama_model_id or cfg.ollama_model_id
+    return LLMSettings(
+        provider=provider,
+        ollama_host=base.ollama_host,
+        ollama_model_id=ollama_model,
+        openai_model_id=base.openai_model_id,
+    )
+
+
 def validate_llm_settings(settings: LLMSettings) -> Optional[str]:
     """Return error message if provider cannot run, else None."""
     if settings.provider not in VALID_PROVIDERS:

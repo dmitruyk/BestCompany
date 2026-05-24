@@ -3,11 +3,13 @@ import pytest
 
 from apps.agents.llm_settings import (
     LLMSettings,
+    get_llm_settings_for_assistant,
     get_llm_settings_for_idea,
     get_service_llm_settings,
     normalize_provider,
     validate_llm_settings,
 )
+from apps.core.forms import ServiceLLMConfigForm
 from apps.core.models import ServiceLLMConfig
 from apps.ideas.models import IdeaRequest
 
@@ -16,6 +18,15 @@ def test_normalize_provider_aliases() -> None:
     assert normalize_provider("llama") == "ollama"
     assert normalize_provider("OLLAMA") == "ollama"
     assert normalize_provider("openai") == "openai"
+
+
+@pytest.mark.django_db
+def test_service_llm_config_form_renders_model_options() -> None:
+    form = ServiceLLMConfigForm(instance=ServiceLLMConfig.load())
+    openai_html = str(form["openai_model_id"])
+    assert 'value="gpt-4o-mini"' in openai_html
+    assert 'value="gpt-4o"' in openai_html
+    assert openai_html.count("<option") == 2
 
 
 @pytest.mark.django_db
@@ -63,6 +74,32 @@ def test_validate_openai_requires_key(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert err is not None
     assert "OPENAI_API_KEY" in err
+
+
+@pytest.mark.django_db
+def test_get_llm_settings_for_assistant_overrides() -> None:
+    cfg = ServiceLLMConfig.load()
+    cfg.default_provider = "ollama"
+    cfg.ollama_model_id = "qwen3"
+    cfg.assistant_provider = "openai"
+    cfg.assistant_openai_model_id = "gpt-4o-mini"
+    cfg.save()
+    settings = get_llm_settings_for_assistant()
+    assert settings.provider == "openai"
+    assert settings.openai_model_id == "gpt-4o-mini"
+
+
+@pytest.mark.django_db
+def test_get_llm_settings_for_assistant_inherits_default() -> None:
+    cfg = ServiceLLMConfig.load()
+    cfg.default_provider = "ollama"
+    cfg.ollama_model_id = "llama3.2"
+    cfg.assistant_provider = ""
+    cfg.assistant_ollama_model_id = ""
+    cfg.save()
+    settings = get_llm_settings_for_assistant()
+    assert settings.provider == "ollama"
+    assert settings.ollama_model_id == "llama3.2"
 
 
 @pytest.mark.django_db

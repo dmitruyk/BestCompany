@@ -87,7 +87,20 @@ Companies use structured planning separate from the calendar:
 
 Host cron alternative: `scripts/run_company_ticker.sh` or `make ticker-once`.
 
-UI routes: `/companies/<id>/planning/`, `/tasks/`, `/direction/`, `/history/`.
+UI routes: `/companies/<id>/planning/`, `/tasks/`, `/direction/`, `/history/`, `/assistant/`.
+
+## Company Assistant
+
+The **Assistant** tab (`CompanyAssistantMessage`) answers owner/team questions. Context is loaded via **read-only tool functions**, not one giant prompt dump. When the user asks to **fix** readiness failures, the server proposes **`CompanyAssistantProposedAction`** rows (planning session, seed tasks from idea pipeline, draft direction); the **owner/admin must approve** before anything runs.
+
+- **Data layer**: `apps/ideas/company_assistant_data.py` — fetchers for tasks, calendar, discussions, team/agents, readiness, etc.
+- **Config**: `apps/ideas/company_assistant_config.py` — per-tool char budgets and `MAX_TOOL_CONTEXT_CHARS` (~36k).
+- **Tools**: `apps/ideas/company_assistant_tools.py` — `select_tools_for_question()` picks a minimal slice; `execute_assistant_tools()` runs them **in parallel** (`ThreadPoolExecutor`) with per-tool truncation and structured logging.
+- **Runner**: `apps/ideas/company_assistant_runner.py` — one structured LLM call after tools; slim bootstrap (company id + public URL only, no duplicate overview).
+- **Async (non-blocking UI)**: `company_assistant_send` returns immediately; `subprocess.Popen(run_company_assistant)` runs tools + LLM in a child process.
+- **UI**: Full URLs from `DJANGO_PUBLIC_HOST`; questions capped at 2000 characters.
+- **Access**: `get_company_for_user` (owners, linked team members, staff).
+- **Conversations**: `CompanyAssistantConversation` groups messages per user; `build_conversation_transcript()` caps history (~14k chars).
 
 ## Confidence Scoring
 

@@ -50,6 +50,19 @@
             .table-scroll {
                 @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0;
             }
+            .assistant-response-body a {
+                @apply text-indigo-600 font-medium underline decoration-indigo-300
+                    hover:text-indigo-800 hover:decoration-indigo-600;
+            }
+            .assistant-response-body ul {
+                @apply list-disc pl-5 my-2 space-y-1;
+            }
+            .assistant-response-body p {
+                @apply my-2 leading-relaxed;
+            }
+            .assistant-response-body strong {
+                @apply font-semibold text-slate-900;
+            }
         }
     </style>
 </head>
@@ -80,7 +93,7 @@
                         <span class="text-sm text-slate-600 hidden sm:inline" aria-label="Signed in as">{{ user.username }}</span>
                         {% if is_app_admin %}
                         <a href="{% url 'user_list' %}" class="link-nav">Users</a>
-                        <a href="{% url 'llm_settings' %}" class="link-nav">LLM</a>
+                        <a href="{% url 'llm_settings' %}" class="link-nav">Service LLM</a>
                         <a href="{% url 'admin:index' %}" class="link-nav">Admin</a>
                         {% endif %}
                         <a href="{% url 'app_logout' %}" class="link-nav">Logout</a>

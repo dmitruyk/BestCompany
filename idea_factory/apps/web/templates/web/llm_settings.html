@@ -1,109 +1,232 @@
 {% extends "base.html" %}
+{% load web_extras %}
 
-{% block title %}LLM Settings - Idea Factory{% endblock %}
+{% block title %}Service LLM - Idea Factory{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl">
-    <h1 class="text-2xl font-bold text-slate-900 mb-2">LLM configuration</h1>
-    <p class="text-sm text-slate-500 mb-6">
-        Service-wide default for new ideas, agent fleet, and autonomous loop.
-        Switch between <strong>Ollama</strong> (local) and <strong>OpenAI</strong>.
-        Per-idea overrides remain available on the New Idea form.
-    </p>
+    <div class="mb-6">
+        <a href="{% url 'home' %}" class="link-back">← Idea requests</a>
+        <h1 class="text-2xl font-bold text-slate-900 mt-1">Service LLM</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Service-wide defaults for idea pipelines, agents, and the company Assistant.
+            API keys stay in <code class="bg-slate-100 px-1 rounded text-xs">.env</code>
+            (<code class="bg-slate-100 px-1 rounded text-xs">OPENAI_API_KEY</code> for OpenAI).
+        </p>
+    </div>
 
-    <div class="mb-6 p-4 rounded-lg bg-slate-100 border border-slate-200 text-sm">
-        <p class="font-medium text-slate-800">Active now</p>
-        <p class="text-slate-600 mt-1">
-            Provider: <span class="font-medium">{{ active_settings.provider }}</span>
-            · Model: <span class="font-medium">{{ active_settings.model_id_for_provider }}</span>
+    {% guide_hint title="Two configuration layers" body="Service default powers new idea requests and most agent work. Company Assistant can use the same settings or its own provider and model — useful when you want a faster local model for chat and a stronger model for pipelines." %}
+
+    <section class="mb-6 space-y-3" aria-label="Active configuration">
+        <div class="p-4 rounded-lg border text-sm {% if provider_error %}bg-amber-50 border-amber-200{% else %}bg-emerald-50 border-emerald-200{% endif %}" role="status">
+            <p class="font-semibold {% if provider_error %}text-amber-900{% else %}text-emerald-900{% endif %}">
+                Service default (ideas &amp; pipeline)
+            </p>
+            <p class="mt-1 {% if provider_error %}text-amber-800{% else %}text-emerald-800{% endif %}">
+                <span class="font-medium">{{ active_settings.provider }}</span>
+                · <span class="font-medium">{{ active_settings.model_id_for_provider }}</span>
+                {% if active_settings.provider == 'ollama' %}
+                · host <code class="text-xs bg-white/60 px-1 rounded">{{ active_settings.ollama_host }}</code>
+                {% endif %}
+            </p>
+            {% if provider_error %}
+            <p class="mt-2 text-amber-800" role="alert">{{ provider_error }}</p>
+            {% endif %}
+        </div>
+
+        <div class="p-4 rounded-lg border text-sm {% if assistant_error %}bg-amber-50 border-amber-200{% else %}bg-slate-100 border-slate-200{% endif %}" role="status">
+            <p class="font-semibold text-slate-900">Company Assistant (active)</p>
+            <p class="mt-1 text-slate-700">
+                <span class="font-medium">{{ assistant_settings.provider }}</span>
+                · <span class="font-medium">{{ assistant_settings.model_id_for_provider }}</span>
+            </p>
+            <p class="text-xs text-slate-500 mt-1">Used on every company Assistant tab. Configure in the Assistant section below.</p>
+            {% if assistant_error %}
+            <p class="mt-2 text-amber-800" role="alert">{{ assistant_error }}</p>
+            {% endif %}
+        </div>
+
+        {% if active_settings.provider == 'openai' or assistant_settings.provider == 'openai' %}
+        <p class="text-sm text-slate-600" role="status">
+            OpenAI API key:
+            {% if openai_key_set %}
+            <span class="text-emerald-700 font-medium">set in .env</span>
+            {% else %}
+            <span class="text-red-700 font-medium">missing — add OPENAI_API_KEY to .env and restart the server</span>
+            {% endif %}
         </p>
-        {% if active_settings.provider == 'openai' %}
-        <p class="text-slate-600 mt-1">
-            API key: {% if openai_key_set %}<span class="text-emerald-600">set in .env</span>{% else %}<span class="text-red-600">missing — set OPENAI_API_KEY in .env</span>{% endif %}
-        </p>
-        {% else %}
-        <p class="text-slate-600 mt-1">Ollama host: {{ active_settings.ollama_host }}</p>
         {% endif %}
-    </div>
+    </section>
 
-    {% if provider_error %}
-    <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
-        <p class="font-medium">Configuration issue</p>
-        <p class="text-sm mt-1">{{ provider_error }}</p>
-    </div>
-    {% endif %}
-
-    <form method="post" action="{% url 'llm_settings' %}" class="space-y-5 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <form method="post" action="{% url 'llm_settings' %}" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6" id="llm-settings-form" novalidate>
         {% csrf_token %}
-        <div>
-            <label for="id_default_provider" class="block text-sm font-medium text-slate-700 mb-1">Default provider</label>
-            {{ form.default_provider }}
+
+        {% if form.non_field_errors %}
+        <div class="p-4 rounded-lg bg-red-50 border border-red-200 text-red-900 text-sm" role="alert">
+            {{ form.non_field_errors }}
         </div>
-        <div id="ollama-fields" class="space-y-4 border-t border-slate-200 pt-4">
-            <p class="text-sm font-medium text-slate-700">Ollama settings</p>
+        {% endif %}
+
+        <fieldset class="space-y-4">
+            <legend class="text-sm font-semibold text-slate-900">Service default (ideas &amp; pipeline)</legend>
+            <p class="text-xs text-slate-500 -mt-2">{{ form.default_provider.help_text }}</p>
             <div>
-                <label for="id_ollama_host" class="block text-xs font-medium text-slate-600 mb-1">Host URL</label>
-                {{ form.ollama_host }}
+                <label for="id_default_provider" class="block text-sm font-medium text-slate-700 mb-1">Provider</label>
+                {{ form.default_provider }}
+                {% if form.default_provider.errors %}<p class="text-xs text-red-600 mt-1">{{ form.default_provider.errors.0 }}</p>{% endif %}
             </div>
+
+            <div id="ollama-fields" class="space-y-4 border-t border-slate-100 pt-4">
+                <p class="text-sm font-medium text-slate-800">Ollama</p>
+                <div>
+                    <label for="id_ollama_host" class="block text-sm font-medium text-slate-700 mb-1">Host URL</label>
+                    {{ form.ollama_host }}
+                    <p class="text-xs text-slate-500 mt-1">{{ form.ollama_host.help_text }}</p>
+                    {% if form.ollama_host.errors %}<p class="text-xs text-red-600 mt-1">{{ form.ollama_host.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="id_ollama_model_id" class="block text-sm font-medium text-slate-700 mb-1">Model</label>
+                    {{ form.ollama_model_id }}
+                    <p class="text-xs text-slate-500 mt-1">{{ form.ollama_model_id.help_text }}</p>
+                    {% if form.ollama_model_id.errors %}<p class="text-xs text-red-600 mt-1">{{ form.ollama_model_id.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+
+            <div id="openai-fields" class="space-y-4 border-t border-slate-100 pt-4">
+                <p class="text-sm font-medium text-slate-800">OpenAI</p>
+                <div>
+                    <label for="id_openai_model_id" class="block text-sm font-medium text-slate-700 mb-1">Model</label>
+                    {{ form.openai_model_id }}
+                    <p class="text-xs text-slate-500 mt-1">{{ form.openai_model_id.help_text }}</p>
+                    {% if form.openai_model_id.errors %}<p class="text-xs text-red-600 mt-1">{{ form.openai_model_id.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="space-y-4 border-t border-slate-200 pt-6">
+            <legend class="text-sm font-semibold text-slate-900">Company Assistant</legend>
+            <p class="text-xs text-slate-500 -mt-2">Optional overrides for the read-only Assistant on each company. Per-idea provider overrides still apply to individual requests.</p>
             <div>
-                <label for="id_ollama_model_id" class="block text-xs font-medium text-slate-600 mb-1">Model ID</label>
-                {{ form.ollama_model_id }}
-                <p class="text-xs text-slate-500 mt-1">Examples: {% for value, label in ollama_models %}{{ value }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+                <label for="id_assistant_provider" class="block text-sm font-medium text-slate-700 mb-1">Assistant provider</label>
+                {{ form.assistant_provider }}
+                <p class="text-xs text-slate-500 mt-1">{{ form.assistant_provider.help_text }}</p>
+                {% if form.assistant_provider.errors %}<p class="text-xs text-red-600 mt-1">{{ form.assistant_provider.errors.0 }}</p>{% endif %}
             </div>
-        </div>
-        <div id="openai-fields" class="space-y-4 border-t border-slate-200 pt-4">
-            <p class="text-sm font-medium text-slate-700">OpenAI settings</p>
-            <div>
-                <label for="id_openai_model_id" class="block text-xs font-medium text-slate-600 mb-1">Model ID</label>
-                {{ form.openai_model_id }}
-                <p class="text-xs text-slate-500 mt-1">API key is read from <code class="bg-slate-100 px-1 rounded">OPENAI_API_KEY</code> in .env only.</p>
+            <div id="assistant-ollama-fields">
+                <label for="id_assistant_ollama_model_id" class="block text-sm font-medium text-slate-700 mb-1">Assistant Ollama model</label>
+                {{ form.assistant_ollama_model_id }}
+                <p class="text-xs text-slate-500 mt-1">{{ form.assistant_ollama_model_id.help_text }}</p>
+                {% if form.assistant_ollama_model_id.errors %}<p class="text-xs text-red-600 mt-1">{{ form.assistant_ollama_model_id.errors.0 }}</p>{% endif %}
             </div>
+            <div id="assistant-openai-fields">
+                <label for="id_assistant_openai_model_id" class="block text-sm font-medium text-slate-700 mb-1">Assistant OpenAI model</label>
+                {{ form.assistant_openai_model_id }}
+                <p class="text-xs text-slate-500 mt-1">{{ form.assistant_openai_model_id.help_text }}</p>
+                {% if form.assistant_openai_model_id.errors %}<p class="text-xs text-red-600 mt-1">{{ form.assistant_openai_model_id.errors.0 }}</p>{% endif %}
+            </div>
+        </fieldset>
+
+        <div class="border-t border-slate-200 pt-4 space-y-4">
+            <p class="text-xs text-slate-500">
+                Connection tests use the <strong>saved</strong> configuration (save first if you changed values above).
+            </p>
+            <div class="flex flex-wrap gap-3">
+                <button type="submit" class="btn-primary">Save settings</button>
+                <button type="button" id="test-llm-btn" class="btn-secondary" aria-describedby="test-llm-result">
+                    Test service connection
+                </button>
+                <button type="button" id="test-assistant-llm-btn" class="btn-secondary" aria-describedby="test-assistant-llm-result">
+                    Test Assistant LLM
+                </button>
+            </div>
+            <p id="test-llm-result" class="text-sm hidden" aria-live="polite"></p>
+            <p id="test-assistant-llm-result" class="text-sm hidden" aria-live="polite"></p>
         </div>
-        <div class="flex flex-wrap gap-3 pt-2">
-            <button type="submit" class="inline-flex px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
-                Save settings
-            </button>
-            <button type="button" id="test-llm-btn" class="inline-flex px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
-                Test connection
-            </button>
-        </div>
-        <p id="test-llm-result" class="text-sm hidden"></p>
     </form>
+
+    <section class="mt-8 bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-sm text-slate-700" aria-labelledby="llm-setup-heading">
+        <h2 id="llm-setup-heading" class="text-lg font-semibold text-slate-900 mb-4">Setup guide</h2>
+
+        <h3 class="font-semibold text-slate-800 mb-2">Ollama (local)</h3>
+        <ol class="list-decimal list-inside space-y-2">
+            <li>Install and run <a href="https://ollama.com/" class="text-indigo-600 hover:text-indigo-800" target="_blank" rel="noopener noreferrer">Ollama</a> on the host the app can reach.</li>
+            <li>Pull a model (e.g. <code class="bg-slate-100 px-1 rounded text-xs">ollama pull llama3.2</code>) and select it above.</li>
+            <li>Set host URL to your Ollama API (default <code class="bg-slate-100 px-1 rounded text-xs">http://localhost:11434</code>).</li>
+            <li>Click <strong>Test service connection</strong> after saving.</li>
+        </ol>
+
+        <h3 class="font-semibold text-slate-800 mt-6 mb-2">OpenAI (cloud)</h3>
+        <ol class="list-decimal list-inside space-y-2">
+            <li>Add <code class="bg-slate-100 px-1 rounded text-xs">OPENAI_API_KEY</code> to <code class="bg-slate-100 px-1 rounded text-xs">.env</code> and restart the Django process.</li>
+            <li>Choose a model, save, then run <strong>Test service connection</strong>.</li>
+            <li>Individual idea requests can still override provider in the request form.</li>
+        </ol>
+
+        <p class="mt-4 text-xs text-slate-500">
+            CLI check: <code class="bg-slate-100 px-1 rounded text-xs">python manage.py check_assistant_llm</code>
+        </p>
+    </section>
 </div>
 
 <script>
 (function () {
     const providerSelect = document.getElementById('id_default_provider');
+    const assistantProvider = document.getElementById('id_assistant_provider');
     const ollamaBlock = document.getElementById('ollama-fields');
     const openaiBlock = document.getElementById('openai-fields');
-    const syncBlocks = () => {
+    const assistantOllama = document.getElementById('assistant-ollama-fields');
+    const assistantOpenai = document.getElementById('assistant-openai-fields');
+
+    function effectiveProvider(selectEl, fallbackSelect) {
+        const v = selectEl && selectEl.value;
+        return v || (fallbackSelect ? fallbackSelect.value : 'ollama');
+    }
+
+    function syncBlocks() {
         const p = providerSelect.value;
-        ollamaBlock.style.display = p === 'ollama' ? 'block' : 'none';
-        openaiBlock.style.display = p === 'openai' ? 'block' : 'none';
-    };
+        ollamaBlock.hidden = p !== 'ollama';
+        openaiBlock.hidden = p !== 'openai';
+        const ap = effectiveProvider(assistantProvider, providerSelect);
+        assistantOllama.hidden = ap !== 'ollama';
+        assistantOpenai.hidden = ap !== 'openai';
+    }
     providerSelect.addEventListener('change', syncBlocks);
+    if (assistantProvider) assistantProvider.addEventListener('change', syncBlocks);
     syncBlocks();
 
-    const testBtn = document.getElementById('test-llm-btn');
-    const testResult = document.getElementById('test-llm-result');
-    testBtn.addEventListener('click', async () => {
-        testBtn.disabled = true;
-        testResult.classList.remove('hidden');
+    async function runTest(target, button) {
+        const resultId = target === 'assistant' ? 'test-assistant-llm-result' : 'test-llm-result';
+        const testResult = document.getElementById(resultId);
+        const label = button.textContent;
+        testResult.classList.remove('hidden', 'text-emerald-700', 'text-red-700');
+        testResult.classList.add('text-slate-600');
         testResult.textContent = 'Testing…';
-        testResult.className = 'text-sm text-slate-600';
-        const formData = new FormData();
-        formData.append('provider', providerSelect.value);
-        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
         try {
+            const formData = new FormData();
+            formData.append('target', target);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
             const res = await fetch('{% url "llm_settings_test" %}', { method: 'POST', body: formData });
             const data = await res.json();
             testResult.textContent = data.message;
-            testResult.className = data.ok ? 'text-sm text-emerald-700' : 'text-sm text-red-700';
+            testResult.classList.remove('text-slate-600', 'text-emerald-700', 'text-red-700');
+            testResult.classList.add(data.ok ? 'text-emerald-700' : 'text-red-700');
         } catch (e) {
             testResult.textContent = 'Request failed: ' + e;
-            testResult.className = 'text-sm text-red-700';
+            testResult.classList.add('text-red-700');
+        } finally {
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+            button.textContent = label;
         }
-        testBtn.disabled = false;
+    }
+
+    document.getElementById('test-llm-btn').addEventListener('click', function () {
+        runTest('service', this);
+    });
+    document.getElementById('test-assistant-llm-btn').addEventListener('click', function () {
+        runTest('assistant', this);
     });
 })();
 </script>

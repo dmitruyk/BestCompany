@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load web_extras %}
+
+{% block title %}Ask agents - {{ company.name }}{% endblock %}
+
+{% block content %}
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+
+<div class="mb-4">
+    <h2 class="text-xl font-bold text-slate-900">Ask multiple agents</h2>
+    <p class="mt-1 text-sm text-slate-600">Select two or more specialists. They discuss your question in turn and produce a combined recommendation.</p>
+</div>
+
+{% agent_panel_question_examples as question_examples %}
+{% guide_hint title="Panel discussion" body="Pick agents with different perspectives — for example CPA and Product Manager on pricing, or Marketer and Developer on launch scope. Each agent sees prior contributions before speaking." examples=question_examples examples_label="Example questions" fill_input_id="question" %}
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-2xl">
+    <form method="post">
+        {% csrf_token %}
+        <label for="question" class="block text-sm font-medium text-slate-700 mb-2">Your question</label>
+        <textarea id="question" name="question" rows="3" required
+            class="form-control w-full"
+            placeholder="e.g. Should we launch a freemium tier before paid marketing spend?"></textarea>
+
+        <fieldset class="mt-6">
+            <legend class="block text-sm font-medium text-slate-700 mb-3">Select agents (minimum {{ min_panel_agents }})</legend>
+            <div class="space-y-2 max-h-72 overflow-y-auto">
+                {% for agent in agents %}
+                <label class="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <input type="checkbox" name="agent_ids" value="{{ agent.pk }}"
+                        class="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        {% if agent.role == 'cpa' or agent.role == 'product' %}checked{% endif %}
+                        aria-label="Include {{ agent.name }}">
+                    <span class="min-w-0">
+                        <span class="font-medium text-slate-900">{{ agent.name }}</span>
+                        <span class="text-sm text-slate-500 ml-1">({{ agent.get_role_display }})</span>
+                    </span>
+                </label>
+                {% empty %}
+                <p class="text-slate-500 text-sm">No agents yet. Fleet may still be generating.</p>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <button type="submit" class="mt-6 btn-primary" {% if agents|length < min_panel_agents %}disabled aria-disabled="true"{% endif %}>
+            Start panel discussion
+        </button>
+        {% if agents|length < min_panel_agents %}
+        <p class="mt-2 text-sm text-amber-700">Need at least {{ min_panel_agents }} agents in the fleet to run a panel.</p>
+        {% endif %}
+    </form>
+</div>
+
+<script>
+(function () {
+    const input = document.getElementById('question');
+    if (!input) return;
+    document.querySelectorAll('[data-fill-chat]').forEach(function (el) {
+        el.addEventListener('click', function () {
+            input.value = el.getAttribute('data-fill-chat');
+            input.focus();
+        });
+    });
+})();
+</script>
+{% endblock %}

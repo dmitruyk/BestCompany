@@ -222,17 +222,11 @@ def start_planning_session(
 
 def spawn_planning_process(session_pk: str) -> None:
     """Run planning in a background manage.py subprocess."""
-    from apps.web.views import _get_project_root, _get_subprocess_env
+    from apps.web.subprocess_utils import get_project_root, get_subprocess_env, manage_py_argv
 
-    root = _get_project_root()
     subprocess.Popen(
-        [
-            sys.executable,
-            os.path.join(root, "manage.py"),
-            "run_planning_session",
-            session_pk,
-        ],
-        cwd=root,
-        env=_get_subprocess_env(),
+        manage_py_argv("run_planning_session", session_pk),
+        cwd=get_project_root(),
+        env=get_subprocess_env(),
         start_new_session=True,
     )

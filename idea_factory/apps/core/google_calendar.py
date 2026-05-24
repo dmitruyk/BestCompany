@@ -289,18 +289,18 @@ def _get_calendar_service(profile):
 
 
 def _company_task_url(task) -> str:
+    from apps.core.public_urls import public_absolute_url
+
     path = reverse(
         "company_task_detail",
         kwargs={"company_pk": task.company_id, "task_pk": task.pk},
     )
-    host = getattr(settings, "DJANGO_PUBLIC_HOST", "").strip()
-    if not host:
-        return path
-    scheme = "https" if not settings.DEBUG else "http"
-    return f"{scheme}://{host}{path}"
+    return public_absolute_url(path)
 
 
 def _calendar_entry_url(entry) -> str:
+    from apps.core.public_urls import public_absolute_url
+
     path = reverse(
         "company_calendar_date",
         kwargs={
@@ -310,11 +310,7 @@ def _calendar_entry_url(entry) -> str:
             "day": entry.action_date.day,
         },
     )
-    host = getattr(settings, "DJANGO_PUBLIC_HOST", "").strip()
-    if not host:
-        return path
-    scheme = "https" if not settings.DEBUG else "http"
-    return f"{scheme}://{host}{path}"
+    return public_absolute_url(path)
 
 
 def build_google_event_body(entry, profile) -> dict[str, Any]:

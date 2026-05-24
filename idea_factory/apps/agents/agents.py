@@ -33,7 +33,7 @@ def _messages_from_prompt(user_prompt: str) -> list:
     return [{"role": "user", "content": [{"text": user_prompt}]}]
 
 
-def _run_agent_ollama_direct(
+def _run_structured_output_direct(
     model: Model,
     agent_name: str,
     system_prompt: str,
@@ -41,7 +41,10 @@ def _run_agent_ollama_direct(
     structured_output_model: type,
 ) -> tuple[Any, dict[str, Any]]:
     """
-    Use model.structured_output() directly for Ollama (bypasses tool_choice which Ollama ignores).
+    Single LLM call via model.structured_output() — no Agent loop or tool rounds.
+
+    Used for Ollama (tool_choice ignored) and for read-only paths that already gathered
+    context server-side (company assistant), to avoid extra OpenAI requests and retries.
     """
 
     async def _run() -> tuple[Any, dict[str, Any]]:
@@ -148,7 +151,7 @@ def _run_agent(
         raise ValueError(f"Ollama workaround not implemented for agent with tools: {agent_name}")
 
     if is_ollama_model(model) and not tools:
-        return _run_agent_ollama_direct(
+        return _run_structured_output_direct(
             model, agent_name, system_prompt, user_prompt, structured_output_model
         )
 

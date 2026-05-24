@@ -10,6 +10,7 @@ from strands.models.model import Model
 from .llm_settings import (
     LLMSettings,
     PROVIDER_OPENAI,
+    get_llm_settings_for_assistant,
     get_llm_settings_for_idea,
     get_service_llm_settings,
     llm_env,
@@ -37,6 +38,13 @@ def get_model(settings: LLMSettings | None = None) -> Model:
 def get_model_for_idea(idea_request) -> Model:
     """Return model configured for a specific idea request."""
     cfg = get_llm_settings_for_idea(idea_request)
+    with llm_env(cfg):
+        return get_model(cfg)
+
+
+def get_model_for_assistant(idea_request=None) -> Model:
+    """Return model for company Assistant (service assistant_* config in admin)."""
+    cfg = get_llm_settings_for_assistant(idea_request)
     with llm_env(cfg):
         return get_model(cfg)
 
@@ -102,7 +110,11 @@ def _get_openai_model(model_id: str) -> Model:
         )
 
     return OpenAIModel(
-        client_args={"api_key": api_key},
+        client_args={
+            "api_key": api_key,
+            # Fail fast on 429 — default SDK retries hammer the same RPM window.
+            "max_retries": 0,
+        },
         model_id=model_id,
         params={"max_tokens": 4096, "temperature": 0.7},
     )

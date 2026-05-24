@@ -3,6 +3,8 @@ from django.urls import path
 
 from . import (
     auth_views,
+    agent_panel_views,
+    company_assistant_views,
     company_planning_views,
     google_calendar_views,
     llm_settings_views,
@@ -77,6 +79,10 @@ urlpatterns = [
         views.agent_chat_message_status,
         name="agent_chat_message_status",
     ),
+    path("companies/<uuid:company_pk>/agent-panel/new/", agent_panel_views.start_agent_panel, name="start_agent_panel"),
+    path("companies/<uuid:company_pk>/agent-panel/<uuid:discussion_pk>/", agent_panel_views.agent_panel_detail, name="agent_panel_detail"),
+    path("companies/<uuid:company_pk>/agent-panel/<uuid:discussion_pk>/rerun/", agent_panel_views.rerun_agent_panel, name="rerun_agent_panel"),
+    path("companies/<uuid:company_pk>/agent-panel/<uuid:discussion_pk>/status/", agent_panel_views.agent_panel_status, name="agent_panel_status"),
     path("companies/<uuid:company_pk>/discussions/new/", views.start_discussion, name="start_discussion"),
     path("companies/<uuid:company_pk>/discussions/<uuid:discussion_pk>/", views.director_discussion_detail, name="director_discussion_detail"),
     path("companies/<uuid:company_pk>/discussions/<uuid:discussion_pk>/rerun/", views.rerun_discussion, name="rerun_discussion"),
@@ -127,4 +133,39 @@ urlpatterns = [
     ),
     path("companies/<uuid:company_pk>/direction/", company_planning_views.company_direction, name="company_direction"),
     path("companies/<uuid:company_pk>/history/", company_planning_views.company_history, name="company_history"),
+    path(
+        "companies/<uuid:company_pk>/assistant/",
+        company_assistant_views.company_assistant,
+        name="company_assistant",
+    ),
+    path(
+        "companies/<uuid:company_pk>/assistant/new/",
+        company_assistant_views.company_assistant_new,
+        name="company_assistant_new",
+    ),
+    path(
+        "companies/<uuid:company_pk>/assistant/<uuid:conversation_pk>/delete/",
+        company_assistant_views.company_assistant_delete,
+        name="company_assistant_delete",
+    ),
+    path(
+        "companies/<uuid:company_pk>/assistant/send/",
+        company_assistant_views.company_assistant_send,
+        name="company_assistant_send",
+    ),
+    path(
+        "companies/<uuid:company_pk>/assistant/messages/<uuid:message_pk>/status/",
+        company_assistant_views.company_assistant_message_status,
+        name="company_assistant_message_status",
+    ),
+    path(
+        "companies/<uuid:company_pk>/assistant/actions/<uuid:action_pk>/approve/",
+        company_assistant_views.company_assistant_action_approve,
+        name="company_assistant_action_approve",
+    ),
+    path(
+        "companies/<uuid:company_pk>/assistant/actions/<uuid:action_pk>/reject/",
+        company_assistant_views.company_assistant_action_reject,
+        name="company_assistant_action_reject",
+    ),
 ]

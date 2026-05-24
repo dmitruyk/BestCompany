@@ -20,7 +20,14 @@ from apps.ideas.planning_context import compute_progress_metrics, get_active_dir
 from apps.ideas.task_execution import count_runnable_tasks, explain_task_skip
 
 CompanyTab = Literal[
-    "overview", "tasks", "planning", "direction", "calendar", "history", "discussions"
+    "overview",
+    "tasks",
+    "planning",
+    "direction",
+    "calendar",
+    "history",
+    "assistant",
+    "discussions",
 ]
 
 

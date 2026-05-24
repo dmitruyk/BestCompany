@@ -21,13 +21,13 @@
     {% endif %}
 </div>
 
-<div class="mb-6 p-4 rounded-lg bg-slate-50 border border-slate-200 text-sm flex flex-wrap justify-between gap-2 items-center">
+<div class="mb-6 p-4 rounded-lg bg-slate-50 border border-slate-200 text-sm flex flex-wrap justify-between gap-2 items-center" role="status">
     <p class="text-slate-600">
         Service LLM: <span class="font-medium text-slate-800">{{ service_llm.provider }}</span>
-        · {{ service_llm.model_id_for_provider }}
+        · <span class="font-medium text-slate-800">{{ service_llm.model_id_for_provider }}</span>
     </p>
     {% if is_app_admin %}
-    <a href="{% url 'llm_settings' %}" class="text-indigo-600 hover:text-indigo-800 font-medium">Change provider</a>
+    <a href="{% url 'llm_settings' %}" class="link-back">Configure service LLM</a>
     {% endif %}
 </div>
 

@@ -84,6 +84,25 @@ class ServiceLLMConfig(models.Model):
         max_length=100,
         default="gpt-4o-mini",
     )
+    assistant_provider = models.CharField(
+        max_length=20,
+        choices=Provider.choices,
+        blank=True,
+        default="",
+        help_text="LLM for the company Assistant tab. Empty = use default provider above.",
+    )
+    assistant_ollama_model_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Ollama model for Assistant when assistant provider is Ollama (or inherited default is Ollama). Empty = use Ollama model above.",
+    )
+    assistant_openai_model_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="OpenAI model for Assistant when assistant provider is OpenAI (or inherited default is OpenAI). Empty = use OpenAI model above.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -92,6 +111,19 @@ class ServiceLLMConfig(models.Model):
 
     def __str__(self) -> str:
         return f"LLM: {self.get_default_provider_display()}"
+
+    def resolved_assistant_provider(self) -> str:
+        from apps.agents.llm_settings import normalize_provider
+
+        return normalize_provider(self.assistant_provider or self.default_provider)
+
+    def resolved_assistant_model_id(self) -> str:
+        provider = self.resolved_assistant_provider()
+        from apps.agents.llm_settings import PROVIDER_OPENAI
+
+        if provider == PROVIDER_OPENAI:
+            return self.assistant_openai_model_id or self.openai_model_id
+        return self.assistant_ollama_model_id or self.ollama_model_id
 
     def save(self, *args, **kwargs) -> None:
         from apps.agents.llm_settings import normalize_provider

@@ -269,7 +269,7 @@ class DirectorDiscussion(models.Model):
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, related_name="discussions"
     )
-    topic = models.CharField(max_length=255)
+    topic = models.TextField()
     status = models.CharField(
         max_length=30, choices=Status.choices, default=Status.ACTIVE
     )
@@ -371,6 +371,219 @@ class UserAgentMessage(models.Model):
 
     def __str__(self) -> str:
         return f"User -> {self.agent.name} @ {self.created_at}"
+
+
+class AgentPanelDiscussion(models.Model):
+    """Multi-agent panel where selected fleet agents discuss an owner question."""
+
+    class Status(models.TextChoices):
+        ACTIVE = "ACTIVE", "Active"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="agent_panel_discussions"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="agent_panel_discussions",
+    )
+    question = models.TextField()
+    synthesis = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=30, choices=Status.choices, default=Status.ACTIVE
+    )
+    cancelled = models.BooleanField(
+        default=False,
+        help_text="When True, running panel process will exit on next check",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        preview = (self.question[:60] + "…") if len(self.question) > 60 else self.question
+        return f"{preview} ({self.status})"
+
+
+class AgentPanelParticipant(models.Model):
+    """Agent invited to a panel discussion, with turn order."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    discussion = models.ForeignKey(
+        AgentPanelDiscussion, on_delete=models.CASCADE, related_name="participants"
+    )
+    agent = models.ForeignKey(
+        CompanyAgent, on_delete=models.CASCADE, related_name="panel_participations"
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "agent__name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["discussion", "agent"],
+                name="unique_agent_panel_participant",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.agent.name} in panel {self.discussion_id}"
+
+
+class AgentPanelMessage(models.Model):
+    """Message from an agent during a panel discussion."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    discussion = models.ForeignKey(
+        AgentPanelDiscussion, on_delete=models.CASCADE, related_name="messages"
+    )
+    agent = models.ForeignKey(
+        CompanyAgent, on_delete=models.CASCADE, related_name="panel_messages"
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.agent.name} @ {self.created_at}"
+
+
+class CompanyAssistantConversation(models.Model):
+    """A threaded assistant chat session (multiple per user per company)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="assistant_conversations"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="company_assistant_conversations",
+    )
+    title = models.CharField(max_length=120, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        indexes = [
+            models.Index(fields=["company", "user", "-updated_at"]),
+        ]
+
+    def __str__(self) -> str:
+        label = self.title or f"Conversation {self.created_at:%Y-%m-%d %H:%M}"
+        return f"{label} ({self.company.name})"
+
+
+class CompanyAssistantMessage(models.Model):
+    """Single turn in a company assistant conversation."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(
+        CompanyAssistantConversation,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="assistant_messages"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="company_assistant_messages",
+    )
+    user_content = models.TextField()
+    assistant_response = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["conversation", "created_at"]),
+            models.Index(fields=["company", "user", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Assistant @ {self.company.name} ({self.created_at})"
+
+
+class CompanyAssistantProposedAction(models.Model):
+    """User-confirmed action suggested by the company assistant."""
+
+    class ActionType(models.TextChoices):
+        START_PLANNING_SESSION = (
+            "start_planning_session",
+            "Start AI planning session",
+        )
+        SEED_TASKS_FROM_IDEA = (
+            "seed_tasks_from_idea",
+            "Create tasks from idea pipeline",
+        )
+        DRAFT_STRATEGIC_DIRECTION = (
+            "draft_strategic_direction",
+            "Draft strategic direction from idea summary",
+        )
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending approval"
+        RUNNING = "running", "Running"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    message = models.ForeignKey(
+        CompanyAssistantMessage,
+        on_delete=models.CASCADE,
+        related_name="proposed_actions",
+    )
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="assistant_proposed_actions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="assistant_proposed_actions",
+    )
+    action_type = models.CharField(max_length=40, choices=ActionType.choices)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    payload = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    result_message = models.TextField(blank=True, default="")
+    planning_session = models.ForeignKey(
+        "PlanningSession",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assistant_proposals",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    executed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["message", "status"]),
+            models.Index(fields=["company", "user", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.get_status_display()})"
 
 
 class CompanyCalendarAction(models.Model):

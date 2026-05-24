@@ -162,7 +162,10 @@ class ChatResponse(BaseModel):
 
     response: str = Field(
         default="",
-        description="The agent's response to the user's question or suggestion",
+        description=(
+            "The agent's response in Markdown: short paragraphs, `-` bullet lists, "
+            "`**bold**` for emphasis, and `[label](full https URL)` links from tool data"
+        ),
     )
 
 
@@ -181,6 +184,30 @@ class DirectorDiscussionOutput(BaseModel):
     proposed_actions: list[ProposedAction] = Field(
         default_factory=list,
         description="1-2 concrete actions the director proposes",
+    )
+
+
+class AgentPanelContributionOutput(BaseModel):
+    """Single agent's contribution in a multi-agent panel discussion."""
+
+    message: str = Field(
+        default="",
+        description=(
+            "The agent's contribution in Markdown: respond to prior speakers, "
+            "state agreements/disagreements, and give role-specific recommendations"
+        ),
+    )
+
+
+class AgentPanelSynthesisOutput(BaseModel):
+    """Combined recommendation after a multi-agent panel discussion."""
+
+    synthesis: str = Field(
+        default="",
+        description=(
+            "Moderator synthesis in Markdown: agreed recommendation, trade-offs, "
+            "concrete next steps, and open questions for the owner"
+        ),
     )
 
 

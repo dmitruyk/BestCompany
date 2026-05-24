@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from django import template
 
+from apps.core.assistant_markdown import render_assistant_markdown
+
 register = template.Library()
 
 # Example prompts shown on agent chat to guide the owner.
@@ -66,10 +68,22 @@ AGENT_CHAT_EXAMPLES_DEFAULT = [
 ]
 
 COMPANY_STEPS_MANUAL = [
+    "Open the Assistant tab for a read-only summary of company state, plans, and recommendations (with links to tasks and pages).",
     "Chat with an agent (CPA, Product, Marketer, etc.) using Ask — ask about status, risks, or priorities.",
+    "Ask multiple agents together (e.g. CPA + Product Manager) to debate a question and get a combined recommendation.",
     "Start a director discussion (e.g. “Next steps”, “Launch plan”) and wait for action proposals.",
     "Select actions you agree with, then click Schedule selected to add them to the calendar.",
     "Open Calendar to mark items in progress or done and add completion notes.",
+]
+
+COMPANY_ASSISTANT_EXAMPLES = [
+    "Do I have any tasks assigned to me?",
+    "Fix the development plan readiness failure",
+    "What is going on in this company right now?",
+    "Summarize open tasks, blockers, and what needs my attention.",
+    "What did the last planning session decide and what is still open?",
+    "Explain director recommendations and which actions are awaiting my decision.",
+    "What is on the calendar this week and what is overdue?",
 ]
 
 COMPANY_STEPS_AUTONOMOUS = [
@@ -91,6 +105,14 @@ DISCUSSION_TOPIC_EXAMPLES = [
     "Budget review and runway",
     "Product MVP scope and timeline",
     "Hiring and team structure",
+]
+
+AGENT_PANEL_QUESTION_EXAMPLES = [
+    "Should we launch a freemium tier before paid marketing spend?",
+    "What is the minimum viable feature set for our first release?",
+    "How should we allocate budget between development and marketing this quarter?",
+    "Which risks should block launch vs. which can we accept?",
+    "What pricing model fits our target customer and runway?",
 ]
 
 
@@ -160,6 +182,12 @@ def discussion_topic_examples():
 
 
 @register.simple_tag
+def agent_panel_question_examples():
+    """Return example questions for multi-agent panel discussions."""
+    return AGENT_PANEL_QUESTION_EXAMPLES
+
+
+@register.simple_tag
 def new_idea_examples():
     """Return example idea request prompts."""
     return NEW_IDEA_EXAMPLES
@@ -173,3 +201,14 @@ def company_steps_manual():
 @register.simple_tag
 def company_steps_autonomous():
     return COMPANY_STEPS_AUTONOMOUS
+
+
+@register.simple_tag
+def company_assistant_examples():
+    return COMPANY_ASSISTANT_EXAMPLES
+
+
+@register.filter
+def assistant_response_html(text: str) -> str:
+    """Render assistant markdown (links, lists, bold) as safe HTML."""
+    return render_assistant_markdown(text)

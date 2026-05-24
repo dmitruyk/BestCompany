@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load web_extras %}
+
+{% block title %}Agent panel - {{ company.name }}{% endblock %}
+
+{% block content %}
+{% if discussion.status == 'ACTIVE' %}
+{% guide_hint title="Panel in progress" body="Selected agents are discussing your question in turn. This page refreshes when new messages or the final synthesis appear." %}
+{% elif discussion.status == 'COMPLETED' %}
+{% guide_hint title="Recommendation ready" body="Review each agent's perspective below, then read the combined synthesis for agreed next steps and open questions." %}
+{% elif discussion.status == 'FAILED' %}
+{% guide_hint title="What to do next" body="Fix the issue (agent selection, LLM config, or server logs), then click Re-run to try again." %}
+{% endif %}
+
+{% include "web/includes/company_header.html" %}
+{% include "web/includes/company_nav.html" %}
+
+<div class="mb-4 flex justify-between items-start gap-4">
+    <div class="min-w-0">
+        <h2 class="text-xl font-bold text-slate-900">Agent panel</h2>
+        <p class="mt-2 text-slate-700 whitespace-pre-wrap">{{ discussion.question }}</p>
+        <p class="mt-2 text-sm text-slate-500">
+            Participants:
+            {% for p in participants %}{{ p.agent.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        </p>
+        <span class="inline-flex mt-2 px-2 py-1 text-xs font-medium rounded-full
+        {% if discussion.status == 'COMPLETED' %}bg-green-100 text-green-800
+        {% elif discussion.status == 'FAILED' %}bg-red-100 text-red-800
+        {% else %}bg-blue-100 text-blue-800{% endif %}">
+        {{ discussion.get_status_display }}
+        </span>
+    </div>
+    <form method="post" action="{% url 'rerun_agent_panel' company_pk=company.pk discussion_pk=discussion.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
+            aria-label="{% if discussion.status == 'ACTIVE' %}Interrupt and re-run{% else %}Re-run{% endif %} panel">
+            {% if discussion.status == 'ACTIVE' %}Interrupt & Re-run{% else %}Re-run{% endif %}
+        </button>
+    </form>
+</div>
+
+{% if discussion.status == 'FAILED' %}
+<div class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800">
+    <p class="font-medium">Panel discussion failed</p>
+    <p class="text-sm mt-1">This may be due to too few agents, provider configuration, or LLM errors. Check server logs.</p>
+</div>
+{% endif %}
+
+<div class="space-y-6">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">Agent contributions</h2>
+        <div class="space-y-4">
+            {% for msg in panel_messages %}
+            <div class="p-4 rounded-lg bg-slate-50 border border-slate-100">
+                <p class="text-sm font-semibold text-slate-800">
+                    {{ msg.agent.name }}
+                    <span class="font-normal text-slate-500">({{ msg.agent.get_role_display }})</span>
+                </p>
+                <div class="mt-2 text-slate-700 prose prose-sm max-w-none">{{ msg.content|assistant_response_html }}</div>
+                <p class="mt-2 text-xs text-slate-500">{{ msg.created_at|date:"M d, H:i" }}</p>
+            </div>
+            {% empty %}
+            <p class="text-slate-500" id="no-messages-msg">No contributions yet. Agents are thinking…</p>
+            {% endfor %}
+        </div>
+        {% if discussion.status == 'ACTIVE' %}
+        <p class="mt-3 text-sm text-blue-600" id="progress-msg"></p>
+        {% endif %}
+    </div>
+
+    {% if discussion.synthesis %}
+    <div class="bg-white rounded-xl shadow-sm border border-emerald-200 p-6">
+        <h2 class="text-lg font-semibold text-emerald-900 mb-4">Combined recommendation</h2>
+        <div class="text-slate-800 prose prose-sm max-w-none">{{ discussion.synthesis|assistant_response_html }}</div>
+    </div>
+    {% elif discussion.status == 'ACTIVE' %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-weight text-slate-900 mb-2">Combined recommendation</h2>
+        <p class="text-slate-500 text-sm" id="synthesis-pending">Waiting for moderator synthesis after all agents contribute…</p>
+    </div>
+    {% endif %}
+</div>
+
+{% if discussion.status == 'ACTIVE' %}
+<script>
+(function pollPanel(lastMessages, hasSynthesis) {
+    lastMessages = lastMessages || {{ panel_messages|length }};
+    hasSynthesis = hasSynthesis || {% if discussion.synthesis %}true{% else %}false{% endif %};
+    fetch('{% url "agent_panel_status" company_pk=company.pk discussion_pk=discussion.pk %}')
+        .then(r => r.json())
+        .then(function(data) {
+            var progressEl = document.getElementById('progress-msg');
+            if (progressEl) {
+                if (data.messages_count > 0) {
+                    var txt = data.messages_count + ' of ' + (data.participants_count || '?') + ' agents contributed';
+                    if (data.last_agent) txt += ' (last: ' + data.last_agent + ')';
+                    progressEl.textContent = txt;
+                } else {
+                    progressEl.textContent = 'Starting panel…';
+                }
+            }
+            if (data.status !== 'ACTIVE') {
+                window.location.reload();
+                return;
+            }
+            if (data.messages_count > lastMessages || (data.has_synthesis && !hasSynthesis)) {
+                window.location.reload();
+                return;
+            }
+            setTimeout(function() { pollPanel(data.messages_count, data.has_synthesis); }, 2000);
+        })
+        .catch(function() { setTimeout(function() { pollPanel(lastMessages, hasSynthesis); }, 5000); });
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,9 +1,7 @@
 """Views for idea_factory web UI."""
 import json
 import logging
-import os
 import subprocess
-import sys
 from typing import Optional
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -25,6 +23,7 @@ from apps.core.access import (
     user_can_manage_company,
 )
 from apps.ideas.attachments import save_idea_attachments
+from apps.ideas.calendar_context import build_calendar_context, get_company_start_date
 from apps.ideas.context import build_idea_request_prompt
 from apps.ideas.autonomous_loop import count_unscheduled_selected, process_company
 from apps.ideas.schedule_optimizer import (
@@ -33,6 +32,7 @@ from apps.ideas.schedule_optimizer import (
     tasks_by_date_for_month,
 )
 from apps.web.company_workspace import build_company_workspace_context
+from apps.web.subprocess_utils import get_project_root, get_subprocess_env, manage_py_argv
 from apps.ideas.models import (
     ActionProposal,
     AgentRun,
@@ -50,18 +50,7 @@ logger = logging.getLogger(__name__)
 
 # Ollama models that support tools (required for structured output).
 # See https://ollama.com/search?c=tools - llama3, llama3:70b do NOT support tools.
-OLLAMA_MODELS = [
-    ("gpt-oss:20b", "gpt-oss:20b"),
-    ("qwen3", "qwen3"),
-    ("mistral-small3.2", "mistral-small3.2"),
-    ("qwen3-coder", "qwen3-coder"),
-]
-
-# OpenAI models — gpt-4o-mini is the default (best cost vs quality for structured agents).
-OPENAI_MODELS = [
-    ("gpt-4o-mini", "gpt-4o-mini (recommended)"),
-    ("gpt-4o", "gpt-4o (higher quality, higher cost)"),
-]
+from apps.core.llm_choices import OLLAMA_MODELS, OPENAI_MODELS  # noqa: F401 — re-export for templates
 
 
 def _provider_error() -> Optional[str]:
@@ -224,72 +213,52 @@ def add_idea_attachment(request: HttpRequest, pk: str) -> HttpResponse:
     return redirect("idea_detail", pk=pk)
 
 
-def _get_project_root() -> str:
-    """Return absolute path to project root (idea_factory/)."""
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
-def _get_subprocess_env() -> dict:
-    """Build env for subprocess - same database and PYTHONPATH as Django server."""
-    from apps.core.subprocess_env import enrich_subprocess_env
-
-    root = _get_project_root()
-    env = enrich_subprocess_env()
-    env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
-    return env
-
-
 def _spawn_pipeline_process(idea_pk: str) -> None:
     """Spawn pipeline via manage.py in a separate Python process."""
-    root = _get_project_root()
     subprocess.Popen(
-        [sys.executable, os.path.join(root, "manage.py"), "run_pipeline", idea_pk],
-        cwd=root,
-        env=_get_subprocess_env(),
+        manage_py_argv("run_pipeline", idea_pk),
+        cwd=get_project_root(),
+        env=get_subprocess_env(),
         start_new_session=True,
     )
 
 
 def _spawn_rerun_process(idea_pk: str) -> None:
     """Spawn rerun via manage.py in a separate Python process."""
-    root = _get_project_root()
     subprocess.Popen(
-        [sys.executable, os.path.join(root, "manage.py"), "run_pipeline", idea_pk, "--rerun"],
-        cwd=root,
-        env=_get_subprocess_env(),
+        manage_py_argv("run_pipeline", idea_pk, "--rerun"),
+        cwd=get_project_root(),
+        env=get_subprocess_env(),
         start_new_session=True,
     )
 
 
 def _spawn_rerun_from_scratch_process(idea_pk: str) -> None:
     """Spawn full pipeline rerun from scratch (delete all runs, start over)."""
-    root = _get_project_root()
     subprocess.Popen(
-        [sys.executable, os.path.join(root, "manage.py"), "run_pipeline", idea_pk, "--from-scratch"],
-        cwd=root,
-        env=_get_subprocess_env(),
+        manage_py_argv("run_pipeline", idea_pk, "--from-scratch"),
+        cwd=get_project_root(),
+        env=get_subprocess_env(),
         start_new_session=True,
     )
 
 
 def _spawn_fleet_process(idea_pk: str) -> None:
     """Spawn fleet generation via manage.py in a separate Python process."""
-    root = _get_project_root()
     subprocess.Popen(
-        [sys.executable, os.path.join(root, "manage.py"), "run_fleet", idea_pk],
-        cwd=root,
-        env=_get_subprocess_env(),
+        manage_py_argv("run_fleet", idea_pk),
+        cwd=get_project_root(),
+        env=get_subprocess_env(),
         start_new_session=True,
     )
 
 
 def _spawn_regenerate_agents_process(company_pk: str) -> None:
     """Spawn agent regeneration via manage.py in a separate Python process."""
-    root = _get_project_root()
     subprocess.Popen(
-        [sys.executable, os.path.join(root, "manage.py"), "run_regenerate_agents", company_pk],
-        cwd=root,
-        env=_get_subprocess_env(),
+        manage_py_argv("run_regenerate_agents", company_pk),
+        cwd=get_project_root(),
+        env=get_subprocess_env(),
         start_new_session=True,
     )
 
@@ -452,6 +421,9 @@ def company_detail(request: HttpRequest, pk: str) -> HttpResponse:
         {
             "agents": company.agents.all(),
             "discussions": company.discussions.all()[:15],
+            "agent_panels": company.agent_panel_discussions.filter(
+                user=request.user
+            )[:10],
             "team_members": company.team_members.filter(is_active=True),
             "human_roles": CompanyTeamMember.Role.choices,
         }
@@ -571,11 +543,10 @@ def _agent_has_pending_message(agent: CompanyAgent, user) -> bool:
 
 def _spawn_agent_chat_process(message_pk: str) -> None:
     """Spawn agent chat response generation in a separate Python process."""
-    root = _get_project_root()
     subprocess.Popen(
-        [sys.executable, os.path.join(root, "manage.py"), "run_agent_chat", message_pk],
-        cwd=root,
-        env=_get_subprocess_env(),
+        manage_py_argv("run_agent_chat", message_pk),
+        cwd=get_project_root(),
+        env=get_subprocess_env(),
         start_new_session=True,
     )
 
@@ -653,31 +624,6 @@ def agent_chat_message_status(
     )
 
 
-def _get_calendar_context(company: Company) -> str:
-    """Build calendar/action context for agents - actions from company start date onward."""
-    from datetime import timedelta
-
-    start_date = _company_start_date(company)
-    today = timezone.localdate()
-    end = today + timedelta(days=30)
-    entries = CompanyCalendarAction.objects.filter(
-        company=company, action_date__gte=start_date, action_date__lte=end
-    ).order_by("action_date", "title")[:60]
-    if not entries:
-        return "No calendar actions on record yet."
-    lines = [f"Calendar from {start_date} (company start) through {end}:"]
-    for e in entries:
-        date_str = e.action_date.isoformat()
-        lines.append(f"- {date_str}: {e.title} [{e.get_status_display}]")
-        if e.description:
-            desc = e.description[:100] + ("..." if len(e.description) > 100 else "")
-            lines.append(f"  {desc}")
-        if e.completion_notes and e.status == CompanyCalendarAction.ActionStatus.DONE:
-            notes = e.completion_notes[:80] + ("..." if len(e.completion_notes) > 80 else "")
-            lines.append(f"  Done: {notes}")
-    return "\n".join(lines)
-
-
 def _get_agent_response(
     agent: CompanyAgent, user_content: str, user, company: Company
 ) -> str:
@@ -690,7 +636,7 @@ def _get_agent_response(
         model = _get_provider_model_for_idea(idea)
         if model is None:
             return "Unable to connect to AI. Check provider configuration."
-        calendar_ctx = _get_calendar_context(company)
+        calendar_ctx = build_calendar_context(company)
         context = f"""Company: {company.name}
 Idea:
 {build_idea_request_prompt(idea)}
@@ -821,7 +767,7 @@ def action_schedule(request: HttpRequest, company_pk: str, action_pk: str) -> Ht
     if request.method == "POST":
         date_str = request.POST.get("action_date", "").strip()
         action_date = parse_date(date_str) if date_str else timezone.localdate()
-        start_date = _company_start_date(company)
+        start_date = get_company_start_date(company)
         if action_date < start_date:
             action_date = start_date
         entry, created = CompanyCalendarAction.objects.get_or_create(
@@ -842,7 +788,7 @@ def action_schedule(request: HttpRequest, company_pk: str, action_pk: str) -> Ht
             discussion_pk=str(action.discussion_id),
         )
     today = timezone.localdate()
-    start_date = _company_start_date(company)
+    start_date = get_company_start_date(company)
     if today < start_date:
         today = start_date
     return render(
@@ -868,16 +814,6 @@ def action_reject(request: HttpRequest, company_pk: str, action_pk: str) -> Http
     )
 
 
-def _company_start_date(company: Company):
-    """Date when company was created - calendar starts from this day."""
-    from datetime import date
-
-    created = company.created_at
-    if timezone.is_naive(created):
-        return created.date()
-    return timezone.localtime(created).date()
-
-
 @login_required
 @require_http_methods(["GET"])
 def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
@@ -886,7 +822,7 @@ def company_calendar(request: HttpRequest, company_pk: str) -> HttpResponse:
     from datetime import date
 
     company = get_company_for_user(request.user, company_pk)
-    start_date = _company_start_date(company)
+    start_date = get_company_start_date(company)
     today = timezone.localdate()
     if today >= start_date:
         default_year, default_month = today.year, today.month
@@ -981,7 +917,7 @@ def company_calendar_date(
     from datetime import date
 
     company = get_company_for_user(request.user, company_pk)
-    start_date = _company_start_date(company)
+    start_date = get_company_start_date(company)
     action_date = date(year, month, day)
     if action_date < start_date:
         return redirect(
@@ -1020,7 +956,7 @@ def calendar_action_add(request: HttpRequest, company_pk: str) -> HttpResponse:
         description = request.POST.get("description", "").strip()
         date_str = request.POST.get("action_date", "").strip()
         action_date = parse_date(date_str) if date_str else timezone.localdate()
-        start_date = _company_start_date(company)
+        start_date = get_company_start_date(company)
         if action_date < start_date:
             action_date = start_date
         if title:
@@ -1031,7 +967,7 @@ def calendar_action_add(request: HttpRequest, company_pk: str) -> HttpResponse:
                 description=description,
             )
         return redirect("company_calendar", company_pk=company_pk)
-    start_date = _company_start_date(company)
+    start_date = get_company_start_date(company)
     date_str = request.GET.get("date", "")
     parsed = parse_date(date_str) if date_str else None
     if parsed and parsed >= start_date:
@@ -1093,11 +1029,10 @@ def start_discussion(request: HttpRequest, company_pk: str) -> HttpResponse:
 
 def _spawn_discussion_process(discussion_pk: str) -> None:
     """Spawn director discussion via manage.py in a separate Python process."""
-    root = _get_project_root()
     subprocess.Popen(
-        [sys.executable, os.path.join(root, "manage.py"), "run_discussion", discussion_pk],
-        cwd=root,
-        env=_get_subprocess_env(),
+        manage_py_argv("run_discussion", discussion_pk),
+        cwd=get_project_root(),
+        env=get_subprocess_env(),
         start_new_session=True,
     )
 

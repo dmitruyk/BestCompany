@@ -3,6 +3,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
+from apps.core.llm_choices import OLLAMA_MODELS, OPENAI_MODELS
 from apps.core.models import ServiceLLMConfig, UserProfile
 from apps.ideas.models import CompanyTeamMember
 
@@ -355,8 +356,40 @@ class AppUserEditForm(forms.Form):
         return user
 
 
+_ASSISTANT_INHERIT = ("", "— same as service default —")
+
+
 class ServiceLLMConfigForm(forms.ModelForm):
-    """Edit service-wide LLM provider (OpenAI ↔ Ollama)."""
+    """Edit service-wide LLM provider (OpenAI ↔ Ollama) and company Assistant LLM."""
+
+    ollama_model_id = forms.ChoiceField(
+        choices=OLLAMA_MODELS,
+        help_text="Local model name as shown by Ollama (e.g. llama3.2, qwen3).",
+        widget=forms.Select(attrs={"class": _INPUT_CLASS}),
+    )
+    openai_model_id = forms.ChoiceField(
+        choices=OPENAI_MODELS,
+        help_text="Used for idea pipelines and agents when OpenAI is the default provider.",
+        widget=forms.Select(attrs={"class": _INPUT_CLASS}),
+    )
+    assistant_provider = forms.ChoiceField(
+        choices=[_ASSISTANT_INHERIT, *ServiceLLMConfig.Provider.choices],
+        required=False,
+        help_text="Leave as “same as service default” unless the company Assistant should use a different provider.",
+        widget=forms.Select(attrs={"class": _INPUT_CLASS}),
+    )
+    assistant_ollama_model_id = forms.ChoiceField(
+        choices=[_ASSISTANT_INHERIT, *OLLAMA_MODELS],
+        required=False,
+        help_text="Leave inherited to use the service default Ollama model.",
+        widget=forms.Select(attrs={"class": _INPUT_CLASS}),
+    )
+    assistant_openai_model_id = forms.ChoiceField(
+        choices=[_ASSISTANT_INHERIT, *OPENAI_MODELS],
+        required=False,
+        help_text="Leave inherited to use the service default OpenAI model.",
+        widget=forms.Select(attrs={"class": _INPUT_CLASS}),
+    )
 
     class Meta:
         model = ServiceLLMConfig
@@ -365,18 +398,19 @@ class ServiceLLMConfigForm(forms.ModelForm):
             "ollama_host",
             "ollama_model_id",
             "openai_model_id",
+            "assistant_provider",
+            "assistant_ollama_model_id",
+            "assistant_openai_model_id",
         )
         widgets = {
             "default_provider": forms.Select(attrs={"class": _INPUT_CLASS}),
             "ollama_host": forms.URLInput(
                 attrs={"class": _INPUT_CLASS, "placeholder": "http://localhost:11434"}
             ),
-            "ollama_model_id": forms.TextInput(
-                attrs={"class": _INPUT_CLASS, "placeholder": "gpt-oss:20b"}
-            ),
-            "openai_model_id": forms.TextInput(
-                attrs={"class": _INPUT_CLASS, "placeholder": "gpt-4o-mini"}
-            ),
+        }
+        help_texts = {
+            "default_provider": "Default for new idea requests, agent pipelines, and background jobs.",
+            "ollama_host": "Base URL of your Ollama server (include http:// or https://).",
         }
 
 

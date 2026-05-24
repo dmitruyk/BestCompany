@@ -35,7 +35,8 @@ ALLOWED_HOSTS = _env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = _env_list("CSRF_TRUSTED_ORIGINS")
 
 # Optional single hostname for production (also appended to ALLOWED_HOSTS / CSRF).
-_public_host = os.environ.get("DJANGO_PUBLIC_HOST", "").strip()
+DJANGO_PUBLIC_HOST = os.environ.get("DJANGO_PUBLIC_HOST", "").strip()
+_public_host = DJANGO_PUBLIC_HOST
 if _public_host:
     if _public_host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_public_host)

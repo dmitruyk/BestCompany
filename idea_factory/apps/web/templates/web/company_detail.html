@@ -148,7 +148,14 @@
 <div class="grid gap-6 lg:grid-cols-2">
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-2">Agent fleet</h2>
-        <p class="text-sm text-slate-600 mb-4">Chat with specialists for advice on status, risks, budgets, and priorities. You make final decisions.</p>
+        <p class="text-sm text-slate-600 mb-4">Chat with specialists for advice, or ask several agents together to debate a question.</p>
+        <div class="mb-4">
+            <a href="{% url 'start_agent_panel' company_pk=company.pk %}"
+                class="inline-flex items-center px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700"
+                aria-label="Ask multiple agents">
+                Ask multiple agents
+            </a>
+        </div>
         <div class="space-y-2 max-h-80 overflow-y-auto">
             {% for agent in agents %}
             <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
@@ -166,6 +173,20 @@
             <p class="text-slate-500 text-sm">No agents yet. Fleet may still be generating.</p>
             {% endfor %}
         </div>
+        {% if agent_panels %}
+        <div class="mt-6 pt-4 border-t border-slate-200">
+            <h3 class="text-sm font-semibold text-slate-800 mb-2">Recent agent panels</h3>
+            <div class="space-y-2 max-h-40 overflow-y-auto">
+                {% for panel in agent_panels %}
+                <a href="{% url 'agent_panel_detail' company_pk=company.pk discussion_pk=panel.pk %}"
+                    class="block p-2 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100 text-sm">
+                    <span class="font-medium text-slate-900 line-clamp-2">{{ panel.question|truncatechars:80 }}</span>
+                    <span class="text-xs text-slate-500">{{ panel.get_status_display }} · {{ panel.created_at|date:"M d, H:i" }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <div id="discussions" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">

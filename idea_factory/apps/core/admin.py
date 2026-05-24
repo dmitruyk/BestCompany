@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import User
 
-from apps.core.forms import AdminHumanUserCreationForm
+from apps.core.forms import AdminHumanUserCreationForm, ServiceLLMConfigForm
 from apps.core.models import ServiceLLMConfig, UserProfile
 
 
@@ -21,13 +21,49 @@ class UserProfileInline(admin.StackedInline):
 
 @admin.register(ServiceLLMConfig)
 class ServiceLLMConfigAdmin(admin.ModelAdmin):
+    form = ServiceLLMConfigForm
     list_display = (
         "default_provider",
+        "resolved_assistant_provider",
+        "resolved_assistant_model_id",
         "ollama_host",
-        "ollama_model_id",
-        "openai_model_id",
         "updated_at",
     )
+    fieldsets = (
+        (
+            "Service default (ideas, agents, pipeline)",
+            {
+                "fields": (
+                    "default_provider",
+                    "ollama_host",
+                    "ollama_model_id",
+                    "openai_model_id",
+                ),
+            },
+        ),
+        (
+            "Company Assistant",
+            {
+                "description": (
+                    "LLM used on the company Assistant tab. Leave blank to inherit service defaults. "
+                    "Models must be from the dropdown lists configured in LLM settings."
+                ),
+                "fields": (
+                    "assistant_provider",
+                    "assistant_ollama_model_id",
+                    "assistant_openai_model_id",
+                ),
+            },
+        ),
+    )
+
+    @admin.display(description="Assistant provider")
+    def resolved_assistant_provider(self, obj: ServiceLLMConfig) -> str:
+        return obj.resolved_assistant_provider()
+
+    @admin.display(description="Assistant model")
+    def resolved_assistant_model_id(self, obj: ServiceLLMConfig) -> str:
+        return obj.resolved_assistant_model_id()
 
     def has_add_permission(self, request):
         return not ServiceLLMConfig.objects.exists()

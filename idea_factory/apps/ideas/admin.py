@@ -18,6 +18,11 @@ from .models import (
     IdeaConclusion,
     IdeaRequest,
     PlanningSession,
+    AgentPanelDiscussion,
+    AgentPanelMessage,
+    AgentPanelParticipant,
+    CompanyAssistantConversation,
+    CompanyAssistantMessage,
     UserAgentMessage,
 )
 
@@ -113,6 +118,20 @@ class DiscussionMessageAdmin(admin.ModelAdmin):
 class ActionProposalAdmin(admin.ModelAdmin):
     list_display = ("action_type", "discussion", "proposed_by", "status", "created_at")
     list_filter = ("status",)
+
+
+@admin.register(CompanyAssistantConversation)
+class CompanyAssistantConversationAdmin(admin.ModelAdmin):
+    list_display = ("title", "company", "user", "updated_at", "created_at")
+    search_fields = ("title", "company__name", "user__username")
+    raw_id_fields = ("company", "user")
+
+
+@admin.register(CompanyAssistantMessage)
+class CompanyAssistantMessageAdmin(admin.ModelAdmin):
+    list_display = ("conversation", "company", "user", "created_at")
+    search_fields = ("user_content", "assistant_response", "company__name")
+    raw_id_fields = ("conversation", "company", "user")
 
 
 @admin.register(UserAgentMessage)
